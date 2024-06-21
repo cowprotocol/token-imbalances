@@ -4,6 +4,7 @@ from web3 import Web3
 from imbalances_script import compute_imbalances
 from multiprocessing import Process
 from dotenv import load_dotenv
+from constants import SETTLEMENT_CONTRACT_ADDRESS
 
 load_dotenv()
 INFURA_KEY = os.getenv('INFURA_KEY')
@@ -12,7 +13,6 @@ CHAIN_RPC_ENDPOINTS = {
     'Ethereum': f'https://mainnet.infura.io/v3/{INFURA_KEY}',
     'Gnosis': 'https://rpc.gnosischain.com'
 }
-SETTLEMENT_CONTRACT_ADDRESS = Web3.to_checksum_address('0x9008D19f58AAbD9eD0D60971565AA8510560ab41')
 
 # Sleep times for each chain in seconds
 CHAIN_SLEEP_TIMES = {
