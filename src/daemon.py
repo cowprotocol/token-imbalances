@@ -1,10 +1,10 @@
 import os
 import time
 from web3 import Web3
-from imbalances_script import compute_imbalances
 from multiprocessing import Process
 from dotenv import load_dotenv
-from constants import SETTLEMENT_CONTRACT_ADDRESS
+from src.constants import SETTLEMENT_CONTRACT_ADDRESS
+from src.imbalances_script import RawTokenImbalances
 
 load_dotenv()
 INFURA_KEY = os.getenv('INFURA_KEY')
@@ -39,6 +39,8 @@ def process_transactions(chain_name):
 
     print(f"{chain_name} Daemon started, sleeping for {sleep_time} seconds between checks.")
     
+    rt = RawTokenImbalances()
+
     while True:
         latest_block = web3.eth.block_number
         if previous_block == latest_block:
@@ -57,7 +59,7 @@ def process_transactions(chain_name):
             for tx in transactions:
                 print(f'Processing transaction on {chain_name}: {tx.hash.hex()}')
                 try:
-                    imbalances, _ = compute_imbalances(tx.hash.hex())
+                    imbalances, _ = rt.compute_imbalances(tx.hash.hex())
                     print(f"Token Imbalances on {chain_name}:")
                     for token_address, imbalance in imbalances.items():
                         print(f"Token: {token_address}, Imbalance: {imbalance}")
