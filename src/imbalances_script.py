@@ -4,9 +4,13 @@ import json
 from typing import Dict, List, Optional, Tuple
 from web3 import Web3
 from dotenv import load_dotenv
-from src.constants import (SETTLEMENT_CONTRACT_ADDRESS, NATIVE_ETH_TOKEN_ADDRESS, 
-                       WETH_TOKEN_ADDRESS, SDAI_TOKEN_ADDRESS, EVENT_TOPICS)
+import sys
 
+# for debugging purposes 
+# sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+from src.constants import (SETTLEMENT_CONTRACT_ADDRESS, NATIVE_ETH_TOKEN_ADDRESS, 
+                           WETH_TOKEN_ADDRESS, SDAI_TOKEN_ADDRESS, EVENT_TOPICS)
 class RawTokenImbalances:
     def __init__(self):
         load_dotenv()
