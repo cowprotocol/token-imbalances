@@ -1,10 +1,8 @@
-import os
 import requests
 import json
 from typing import Dict, List, Optional, Tuple
 from web3 import Web3
-from dotenv import load_dotenv
-
+from src.config import CHAIN_RPC_ENDPOINTS
 from src.constants import (SETTLEMENT_CONTRACT_ADDRESS, NATIVE_ETH_TOKEN_ADDRESS, 
                            WETH_TOKEN_ADDRESS, SDAI_TOKEN_ADDRESS)
 
@@ -16,20 +14,12 @@ EVENT_TOPICS = {
     'WithdrawSDAI': 'Withdraw(address,address,address,uint256,uint256)',
 }
 
-class RawTokenImbalances:
-    def __init__(self):
-        load_dotenv()
-        self.INFURA_KEY = os.getenv('INFURA_KEY')
-        self.CHAIN_RPC_ENDPOINTS = {
-            'Ethereum': f'https://mainnet.infura.io/v3/{self.INFURA_KEY}',
-            'Arbitrum': f'https://arbitrum-mainnet.infura.io/v3/{self.INFURA_KEY}',
-            'Gnosis': 'https://rpc.gnosis.gateway.fm'
-        }
-        self.WEB3_INSTANCES = {chain: Web3(Web3.HTTPProvider(url)) for chain, url in self.CHAIN_RPC_ENDPOINTS.items()}
+WEB3_INSTANCES = {chain: Web3(Web3.HTTPProvider(url)) for chain, url in CHAIN_RPC_ENDPOINTS.items()}
 
-    def get_web3_instance(self, chain_name: str) -> Web3:
-        """Get the Web3 instance for a specific chain."""
-        return self.WEB3_INSTANCES[chain_name]
+class RawTokenImbalances:
+    def __init__(self, web3: Web3, chain_name: str):
+        self.web3 = web3
+        self.chain_name = chain_name
 
     def get_transaction_trace(self, transaction_hash: str, chain_url: str) -> list[dict] | None:
         """Fetch transaction trace from the RPC endpoint."""
@@ -67,9 +57,9 @@ class RawTokenImbalances:
         outflow = sum(Web3.to_int(hexstr=action.get('value', '0x0')) for action in actions if Web3.to_checksum_address(action.get('from', '')) == address)
         return inflow - outflow
 
-    def extract_events(self, tx_receipt: Dict, web3: Web3) -> Dict[str, List[Dict]]:
+    def extract_events(self, tx_receipt: Dict) -> Dict[str, List[Dict]]:
         """Extract relevant events from the transaction receipt."""
-        event_topics = compute_event_topics(web3)
+        event_topics = compute_event_topics(self.web3)
         transfer_topics = {k: v for k, v in event_topics.items() if k in ['Transfer', 'ERC20Transfer']}
         other_topics = {k: v for k, v in event_topics.items() if k not in transfer_topics}
 
@@ -123,29 +113,12 @@ class RawTokenImbalances:
             print(f"Error decoding sDAI event: {str(e)}")
             return None
 
-    def find_chain_with_tx(self, tx_hash: str) -> Tuple[str, Web3]:
-        """
-        Find the chain where the transaction is present.
-        Returns the chain name and the web3 instance.
-        """
-        for chain_name, web3 in self.WEB3_INSTANCES.items():
-            if not web3.is_connected():
-                print(f"Could not connect to {chain_name}.")
-                continue
-            try:
-                web3.eth.get_transaction_receipt(tx_hash)
-                print(f"Transaction found on {chain_name}.")
-                return chain_name, web3
-            except Exception as e:
-                print(f"Transaction not found on {chain_name}: {e}")
-        raise ValueError(f"Transaction hash {tx_hash} not found on any chain.")
-
-    def get_transaction_receipt(self, tx_hash: str, web3: Web3) -> Optional[Dict]:
+    def get_transaction_receipt(self, tx_hash: str) -> Optional[Dict]:
         """
         Get the transaction receipt from the provided web3 instance.
         """
         try:
-            return web3.eth.get_transaction_receipt(tx_hash)
+            return self.web3.eth.get_transaction_receipt(tx_hash)
         except Exception as e:
             print(f"Error getting transaction receipt: {e}")
             return None
@@ -207,21 +180,20 @@ class RawTokenImbalances:
             if event['address'] == SDAI_TOKEN_ADDRESS:
                 self.process_sdai_event(event, imbalances, is_deposit=False)
 
-    def compute_imbalances(self, tx_hash: str) -> Tuple[Dict[str, int], str]:
+    def compute_imbalances(self, tx_hash: str) -> Dict[str, int]:
         """Compute token imbalances for a given transaction hash."""
-        chain_name, web3 = self.find_chain_with_tx(tx_hash)
-        tx_receipt = self.get_transaction_receipt(tx_hash, web3)
+        tx_receipt = self.get_transaction_receipt(tx_hash)
         if tx_receipt is None:
-            raise ValueError(f"Transaction hash {tx_hash} not found on chain {chain_name}.")
+            raise ValueError(f"Transaction hash {tx_hash} not found on chain {self.chain_name}.")
 
-        traces = self.get_transaction_trace(tx_hash, self.CHAIN_RPC_ENDPOINTS[chain_name])
+        traces = self.get_transaction_trace(tx_hash, CHAIN_RPC_ENDPOINTS[self.chain_name])
         native_eth_imbalance = None
         actions = []
         if traces is not None:
             actions = self.extract_actions(traces, SETTLEMENT_CONTRACT_ADDRESS)
             native_eth_imbalance = self.calculate_native_eth_imbalance(actions, SETTLEMENT_CONTRACT_ADDRESS)
 
-        events = self.extract_events(tx_receipt, web3)
+        events = self.extract_events(tx_receipt)
         imbalances = self.calculate_imbalances(events, SETTLEMENT_CONTRACT_ADDRESS)
 
         if actions:
@@ -230,17 +202,36 @@ class RawTokenImbalances:
 
         self.update_sdai_imbalance(events, imbalances)
 
-        return imbalances, chain_name
+        return imbalances
 
 def compute_event_topics(web3: Web3) -> Dict[str, str]:
     """Compute the event topics for all relevant events."""
     return {name: web3.keccak(text=text).hex() for name, text in EVENT_TOPICS.items()}
 
+def find_chain_with_tx(tx_hash: str) -> Tuple[str, Web3]:
+    """
+    Find the chain where the transaction is present.
+    Returns the chain name and the web3 instance.
+    """
+    for chain_name, web3 in WEB3_INSTANCES.items():
+        if not web3.is_connected():
+            print(f"Could not connect to {chain_name}.")
+            continue
+        try:
+            web3.eth.get_transaction_receipt(tx_hash)
+            print(f"Transaction found on {chain_name}.")
+            return chain_name, web3
+        except Exception as e:
+            print(f"Transaction not found on {chain_name}: {e}")
+    raise ValueError(f"Transaction hash {tx_hash} not found on any chain.")
+
+# main method for finding imbalance for a single tx hash
 def main() -> None:
-    rt = RawTokenImbalances()
     tx_hash = input("Enter transaction hash: ")
+    chain_name, web3 = find_chain_with_tx(tx_hash)
+    rt = RawTokenImbalances(web3, chain_name)
     try:
-        imbalances, chain_name = rt.compute_imbalances(tx_hash)
+        imbalances = rt.compute_imbalances(tx_hash)
         print(f"Token Imbalances on {chain_name}:")
         for token_address, imbalance in imbalances.items():
             print(f"Token: {token_address}, Imbalance: {imbalance}")
