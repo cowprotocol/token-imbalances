@@ -4,21 +4,8 @@ import pandas as pd
 from web3 import Web3
 from threading import Thread
 from sqlalchemy import create_engine
-from dotenv import load_dotenv
 from src.imbalances_script import RawTokenImbalances
-
-load_dotenv()
-INFURA_KEY = os.getenv('INFURA_KEY')
-
-CHAIN_RPC_ENDPOINTS = {
-    'Ethereum': f'https://mainnet.infura.io/v3/{INFURA_KEY}',
-    'Gnosis': 'https://rpc.gnosis.gateway.fm'
-}
-
-CHAIN_SLEEP_TIMES = {
-    'Ethereum': 60,
-    'Gnosis': 120
-}
+from src.config import CHAIN_RPC_ENDPOINTS, CHAIN_SLEEP_TIMES
 
 def get_web3_instance(chain_name):
     return Web3(Web3.HTTPProvider(CHAIN_RPC_ENDPOINTS[chain_name]))
@@ -52,7 +39,7 @@ def fetch_transaction_hashes(chain_name, start_block, end_block):
 
 def process_transactions(chain_name):
     web3 = get_web3_instance(chain_name)
-    rt = RawTokenImbalances()
+    rt = RawTokenImbalances(web3, chain_name)
     sleep_time = CHAIN_SLEEP_TIMES.get(chain_name)
 
     previous_block = get_finalized_block_number(web3)
@@ -69,7 +56,7 @@ def process_transactions(chain_name):
             for tx in all_txs:
                 print(f'Processing transaction on {chain_name}: {tx}')
                 try:
-                    imbalances, _ = rt.compute_imbalances(tx)
+                    imbalances = rt.compute_imbalances(tx)
                     print(f"Token Imbalances on {chain_name}:")
                     for token_address, imbalance in imbalances.items():
                         print(f"Token: {token_address}, Imbalance: {imbalance}")
