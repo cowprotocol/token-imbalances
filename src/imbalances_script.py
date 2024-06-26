@@ -4,13 +4,18 @@ import json
 from typing import Dict, List, Optional, Tuple
 from web3 import Web3
 from dotenv import load_dotenv
-import sys
-
-# for debugging purposes 
-# sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from src.constants import (SETTLEMENT_CONTRACT_ADDRESS, NATIVE_ETH_TOKEN_ADDRESS, 
-                           WETH_TOKEN_ADDRESS, SDAI_TOKEN_ADDRESS, EVENT_TOPICS)
+                           WETH_TOKEN_ADDRESS, SDAI_TOKEN_ADDRESS)
+
+EVENT_TOPICS = {
+    'Transfer': 'Transfer(address,address,uint256)',
+    'ERC20Transfer': 'ERC20Transfer(address,address,uint256)',
+    'WithdrawalWETH': 'Withdrawal(address,uint256)',
+    'DepositSDAI': 'Deposit(address,address,uint256,uint256)',
+    'WithdrawSDAI': 'Withdraw(address,address,address,uint256,uint256)',
+}
+
 class RawTokenImbalances:
     def __init__(self):
         load_dotenv()
@@ -18,7 +23,7 @@ class RawTokenImbalances:
         self.CHAIN_RPC_ENDPOINTS = {
             'Ethereum': f'https://mainnet.infura.io/v3/{self.INFURA_KEY}',
             'Arbitrum': f'https://arbitrum-mainnet.infura.io/v3/{self.INFURA_KEY}',
-            'Gnosis': 'https://rpc.gnosischain.com'
+            'Gnosis': 'https://rpc.gnosis.gateway.fm'
         }
         self.WEB3_INSTANCES = {chain: Web3(Web3.HTTPProvider(url)) for chain, url in self.CHAIN_RPC_ENDPOINTS.items()}
 
@@ -26,7 +31,7 @@ class RawTokenImbalances:
         """Get the Web3 instance for a specific chain."""
         return self.WEB3_INSTANCES[chain_name]
 
-    def get_transaction_trace(self, transaction_hash: str, chain_url: str) -> Optional[List[Dict]]:
+    def get_transaction_trace(self, transaction_hash: str, chain_url: str) -> list[dict] | None:
         """Fetch transaction trace from the RPC endpoint."""
         payload = {
             "jsonrpc": "2.0",
@@ -36,11 +41,14 @@ class RawTokenImbalances:
         }
         headers = {"Content-Type": "application/json"}
         response = requests.post(chain_url, headers=headers, data=json.dumps(payload))
-        if response.status_code == 200:
+        try:
+            response.raise_for_status()
             return response.json().get('result', [])
-        else:
-            print(f"Error: {response.status_code}, {response.text}")
-            return None
+        except requests.exceptions.HTTPError as err:
+                print(f"HTTP error occurred: {err}")
+        except requests.exceptions.RequestException as err:
+                print(f"Error occurred: {err}")
+        return None
 
     def extract_actions(self, traces: List[Dict], address: str, input_field: str = "0x") -> List[Dict]:
         """Identify transfer events in trace involving the specified contract."""
@@ -59,13 +67,9 @@ class RawTokenImbalances:
         outflow = sum(Web3.to_int(hexstr=action.get('value', '0x0')) for action in actions if Web3.to_checksum_address(action.get('from', '')) == address)
         return inflow - outflow
 
-    def compute_event_topics(self, web3: Web3) -> Dict[str, str]:
-        """Compute the event topics for all relevant events."""
-        return {name: web3.keccak(text=text).hex() for name, text in EVENT_TOPICS.items()}
-
     def extract_events(self, tx_receipt: Dict, web3: Web3) -> Dict[str, List[Dict]]:
         """Extract relevant events from the transaction receipt."""
-        event_topics = self.compute_event_topics(web3)
+        event_topics = compute_event_topics(web3)
         transfer_topics = {k: v for k, v in event_topics.items() if k in ['Transfer', 'ERC20Transfer']}
         other_topics = {k: v for k, v in event_topics.items() if k not in transfer_topics}
 
@@ -105,7 +109,7 @@ class RawTokenImbalances:
             print(f"Error decoding event: {str(e)}")
             return None, None, None
 
-    def decode_sdai_event(self, event: Dict) -> Optional[Tuple[str, int]]:
+    def decode_sdai_event(self, event: Dict) -> int | None:
         """Decode sDAI event."""
         try:
             value_hex = event['data'][-30:]
@@ -114,8 +118,7 @@ class RawTokenImbalances:
                 value = int.from_bytes(value_hex, byteorder='big')
             else:
                 value = int(value_hex, 16)
-            
-            return SETTLEMENT_CONTRACT_ADDRESS, value
+            return value
         except Exception as e:
             print(f"Error decoding sDAI event: {str(e)}")
             return None
@@ -157,17 +160,15 @@ class RawTokenImbalances:
         if from_address == address:
             outflows[event['address']] = outflows.get(event['address'], 0) + value
 
-    def process_sdai_event(self, event: Dict, imbalances: Dict[str, int], is_deposit: bool = True) -> None:
+    def process_sdai_event(self, event: Dict, imbalances: Dict[str, int], is_deposit: bool) -> None:
         """Process an sDAI deposit or withdrawal event to update imbalances."""
-        decoded_event = self.decode_sdai_event(event)
-        if decoded_event is None:
+        decoded_event_value = self.decode_sdai_event(event)
+        if decoded_event_value is None:
             return
-        to_address, value = decoded_event
-        if to_address == SETTLEMENT_CONTRACT_ADDRESS:
-            if is_deposit:
-                imbalances[SDAI_TOKEN_ADDRESS] = imbalances.get(SDAI_TOKEN_ADDRESS, 0) + value
-            else:
-                imbalances[SDAI_TOKEN_ADDRESS] = imbalances.get(SDAI_TOKEN_ADDRESS, 0) - value
+        if is_deposit:
+            imbalances[SDAI_TOKEN_ADDRESS] = imbalances.get(SDAI_TOKEN_ADDRESS, 0) + decoded_event_value
+        else:
+            imbalances[SDAI_TOKEN_ADDRESS] = imbalances.get(SDAI_TOKEN_ADDRESS, 0) - decoded_event_value
 
     def calculate_imbalances(self, events: Dict[str, List[Dict]], address: str) -> Dict[str, int]:
         """Calculate token imbalances from events."""
@@ -230,6 +231,10 @@ class RawTokenImbalances:
         self.update_sdai_imbalance(events, imbalances)
 
         return imbalances, chain_name
+
+def compute_event_topics(web3: Web3) -> Dict[str, str]:
+    """Compute the event topics for all relevant events."""
+    return {name: web3.keccak(text=text).hex() for name, text in EVENT_TOPICS.items()}
 
 def main() -> None:
     rt = RawTokenImbalances()
