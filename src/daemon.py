@@ -16,13 +16,13 @@ def get_finalized_block_number(web3):
 def create_db_connection(chain_name):
     """Helper function that creates a connection to the prod db."""
     db_name = "mainnet" if chain_name == 'Ethereum' else "xdai"
-    db_url = os.getenv("PROD_DB_URL").format(chain=db_name)
-    
-    return create_engine(f"postgresql+psycopg2://{db_url}")
+    prod_url = os.getenv("PROD_DB_URL").format(chain=db_name)
+    barn_url = os.getenv("BARN_DB_URL").format(chain=db_name)
 
-def fetch_transaction_hashes(chain_name, start_block, end_block):
+    return create_engine(f"postgresql+psycopg2://{prod_url}"), create_engine(f"postgresql+psycopg2://{barn_url}")
+
+def fetch_transaction_hashes(prod_connection, barn_connection, start_block, end_block):
     """Fetch transaction hashes beginning start_block."""
-    prod_connection = create_db_connection(chain_name)
     query = f"""
     SELECT tx_hash 
     FROM settlements 
@@ -30,28 +30,31 @@ def fetch_transaction_hashes(chain_name, start_block, end_block):
     AND block_number<={end_block}
     """
 
-    res = pd.read_sql(query, prod_connection)
-    
+    prod_hashes = pd.read_sql(query, prod_connection)
+    barn_hashes = pd.read_sql(query, barn_connection)
     # converts hashes at memory location to hex 
-    res['tx_hash'] = res['tx_hash'].apply(lambda x: f"0x{x.hex()}")
+    prod_hashes['tx_hash'] = prod_hashes['tx_hash'].apply(lambda x: f"0x{x.hex()}")
+    barn_hashes['tx_hash'] = barn_hashes['tx_hash'].apply(lambda x: f"0x{x.hex()}")
+    combined_hashes = prod_hashes['tx_hash'].tolist() + barn_hashes['tx_hash'].tolist()
     
-    return res['tx_hash'].tolist()
+    return combined_hashes
 
 def process_transactions(chain_name):
     web3 = get_web3_instance(chain_name)
     rt = RawTokenImbalances(web3, chain_name)
     sleep_time = CHAIN_SLEEP_TIMES.get(chain_name)
+    prod_connection, barn_connection = create_db_connection(chain_name)
 
     previous_block = get_finalized_block_number(web3)
-    unsuccessful_txs = []
+    unprocessed_txs = []
 
     print(f"{chain_name} Daemon started.")
     
     while True:
         try:
             latest_block = get_finalized_block_number(web3)
-            new_txs = fetch_transaction_hashes(chain_name, previous_block, latest_block)
-            all_txs = new_txs + unsuccessful_txs
+            new_txs = fetch_transaction_hashes(prod_connection, barn_connection, previous_block, latest_block)
+            all_txs = new_txs + unprocessed_txs
 
             for tx in all_txs:
                 print(f'Processing transaction on {chain_name}: {tx}')
@@ -62,7 +65,7 @@ def process_transactions(chain_name):
                         print(f"Token: {token_address}, Imbalance: {imbalance}")
                 except ValueError as e:
                     print(e)
-                    unsuccessful_txs.append(tx)
+                    unprocessed_txs.append(tx)
                   
             print("Done checks..")
             previous_block = latest_block + 1
