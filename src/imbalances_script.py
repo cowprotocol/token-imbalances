@@ -14,8 +14,6 @@ EVENT_TOPICS = {
     'WithdrawSDAI': 'Withdraw(address,address,address,uint256,uint256)',
 }
 
-WEB3_INSTANCES = {chain: Web3(Web3.HTTPProvider(url)) for chain, url in CHAIN_RPC_ENDPOINTS.items()}
-
 class RawTokenImbalances:
     def __init__(self, web3: Web3, chain_name: str):
         self.web3 = web3
@@ -213,7 +211,8 @@ def find_chain_with_tx(tx_hash: str) -> Tuple[str, Web3]:
     Find the chain where the transaction is present.
     Returns the chain name and the web3 instance.
     """
-    for chain_name, web3 in WEB3_INSTANCES.items():
+    for chain_name, url in CHAIN_RPC_ENDPOINTS.items():
+        web3 = Web3(Web3.HTTPProvider(url))
         if not web3.is_connected():
             print(f"Could not connect to {chain_name}.")
             continue
