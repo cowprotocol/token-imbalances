@@ -2,11 +2,12 @@ import os
 from dotenv import load_dotenv
 
 load_dotenv()
-INFURA_KEY = os.getenv('INFURA_KEY')
+ETHEREUM_NODE_URL = os.getenv('ETHEREUM_NODE_URL')
+GNOSIS_NODE_URL = os.getenv('GNOSIS_NODE_URL')
 
 CHAIN_RPC_ENDPOINTS = {
-    'Ethereum': f'https://mainnet.infura.io/v3/{INFURA_KEY}',
-    'Gnosis': 'https://rpc.gnosis.gateway.fm'
+    'Ethereum': ETHEREUM_NODE_URL,
+    'Gnosis': GNOSIS_NODE_URL
 }
 
 CHAIN_SLEEP_TIMES = {
