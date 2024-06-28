@@ -1,10 +1,9 @@
 from web3 import Web3
-from src.config import INFURA_KEY
+from src.config import ETHEREUM_NODE_URL, GNOSIS_NODE_URL
 from src.constants import (SETTLEMENT_CONTRACT_ADDRESS, NATIVE_ETH_TOKEN_ADDRESS)
 from contracts.erc20_abi import erc20_abi
 
-infura_url = f'https://mainnet.infura.io/v3/{INFURA_KEY}'
-web3 = Web3(Web3.HTTPProvider(infura_url))
+web3 = Web3(Web3.HTTPProvider(ETHEREUM_NODE_URL))
 
 def get_token_balance(token_address, account, block_identifier):
     token_contract = web3.eth.contract(address=token_address, abi=erc20_abi)
@@ -12,7 +11,7 @@ def get_token_balance(token_address, account, block_identifier):
         token_balance = token_contract.functions.balanceOf(account).call(block_identifier=block_identifier)
         return token_balance
     except Exception as e:
-        # print(f"Error fetching balance for token {token_address}: {e}")
+        print(f"Error fetching balance for token {token_address}: {e}")
         return None
 
 def get_eth_balance(account, block_identifier):
@@ -25,9 +24,12 @@ def get_eth_balance(account, block_identifier):
 
 def extract_token_addresses(tx_receipt):
     token_addresses = set()
+    transfer_topics = {
+        web3.keccak(text="Transfer(address,address,uint256)").hex(),
+        web3.keccak(text="ERC20Transfer(address,address,uint256)").hex()
+    }
     for log in tx_receipt['logs']:
-        # check for transfer events
-        if log['topics'][0].hex() == web3.keccak(text="Transfer(address,address,uint256)").hex()  or web3.keccak(text="ERC20Transfer(address,address,uint256)").hex():
+        if log['topics'][0].hex() in transfer_topics:
             token_addresses.add(log['address'])
     return token_addresses
 
@@ -77,7 +79,6 @@ def compute_imbalances(tx_hash):
     final_balances = get_balances(token_addresses, final_block)
 
     imbalances = calculate_imbalances(prev_balances, final_balances)
-    
     return imbalances
 
 def main():

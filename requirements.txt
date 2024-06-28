@@ -1,0 +1,6 @@
+requests==2.31.0
+web3==6.0.0
+pandas==2.2.1
+SQLAlchemy==2.0.28
+psycopg2==2.9.9
+python-dotenv==1.0.0
