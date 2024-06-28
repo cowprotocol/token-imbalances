@@ -20,7 +20,7 @@ jobs:
         run: echo "PYTHONPATH=src" >> $GITHUB_ENV
       - name: Pylint
         run:
-          pylint src/
+          pylint src/**/*.py
       - name: Black
         run:
           black --check ./
