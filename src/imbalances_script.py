@@ -1,5 +1,4 @@
-import requests
-import json
+from web3.datastructures import AttributeDict
 from typing import Dict, List, Optional, Tuple
 from web3 import Web3
 from src.config import CHAIN_RPC_ENDPOINTS
@@ -14,51 +13,95 @@ EVENT_TOPICS = {
     'WithdrawSDAI': 'Withdraw(address,address,address,uint256,uint256)',
 }
 
+def compute_event_topics(web3: Web3) -> Dict[str, str]:
+    """Compute the event topics for all relevant events."""
+    return {name: web3.keccak(text=text).hex() for name, text in EVENT_TOPICS.items()}
+
+def find_chain_with_tx(tx_hash: str) -> Tuple[str, Web3]:
+    """
+    Find the chain where the transaction is present.
+    Returns the chain name and the web3 instance.
+    """
+    for chain_name, url in CHAIN_RPC_ENDPOINTS.items():
+        web3 = Web3(Web3.HTTPProvider(url))
+        if not web3.is_connected():
+            print(f"Could not connect to {chain_name}.")
+            continue
+        try:
+            web3.eth.get_transaction_receipt(tx_hash)
+            print(f"Transaction found on {chain_name}.")
+            return chain_name, web3
+        except Exception as e:
+            print(f"Transaction not found on {chain_name}: {e}")
+    raise ValueError(f"Transaction hash {tx_hash} not found on any chain.")
+
+def _to_int(value: str | int) -> int:
+    """Convert hex string or integer to integer."""
+    try:
+        return int(value, 16) if isinstance(value, str) and value.startswith('0x') else int(value)
+    except ValueError:
+        print(f"Error converting value {value} to integer.")
+
 class RawTokenImbalances:
     def __init__(self, web3: Web3, chain_name: str):
         self.web3 = web3
         self.chain_name = chain_name
 
-    def get_transaction_trace(self, transaction_hash: str, chain_url: str) -> list[dict] | None:
-        """Fetch transaction trace from the RPC endpoint."""
-        payload = {
-            "jsonrpc": "2.0",
-            "method": "trace_transaction",
-            "params": [transaction_hash],
-            "id": 1
-        }
-        headers = {"Content-Type": "application/json"}
-        response = requests.post(chain_url, headers=headers, data=json.dumps(payload))
+    def get_transaction_receipt(self, tx_hash: str) -> Optional[Dict]:
+        """
+        Get the transaction receipt from the provided web3 instance.
+        """
         try:
-            response.raise_for_status()
-            return response.json().get('result', [])
-        except requests.exceptions.HTTPError as err:
-                print(f"HTTP error occurred: {err}")
-        except requests.exceptions.RequestException as err:
-                print(f"Error occurred: {err}")
-        return None
+            return self.web3.eth.get_transaction_receipt(tx_hash)
+        except Exception as e:
+            print(f"Error getting transaction receipt: {e}")
+            return None
 
-    def extract_actions(self, traces: List[Dict], address: str, input_field: str = "0x") -> List[Dict]:
+    def get_transaction_trace(self, tx_hash: str) -> Optional[List[Dict]]:
+        try:
+            res = self.web3.tracing.trace_transaction(tx_hash)
+            return res
+        except Exception as err:
+            print(f"Error occurred while fetching transaction trace: {err}")
+            return None
+
+    def extract_actions(self, traces: List[AttributeDict], address: str, input_field: str = '0x') -> List[Dict]:
         """Identify transfer events in trace involving the specified contract."""
         normalized_address = Web3.to_checksum_address(address)
-        return [
-            trace.get('action', {}) for trace in traces
-            if trace.get('action', {}).get('input') == input_field and (
-                Web3.to_checksum_address(trace.get('action', {}).get('from', '')) == normalized_address or
-                Web3.to_checksum_address(trace.get('action', {}).get('to', '')) == normalized_address
-            )
-        ]
+        actions = []
+        for trace in traces:
+            if isinstance(trace, AttributeDict):
+                action = trace.get('action', {})
+                input_value = action.get('input', b"").hex()
+                if input_value == input_field and (
+                    Web3.to_checksum_address(action.get('from', '')) == normalized_address or
+                    Web3.to_checksum_address(action.get('to', '')) == normalized_address
+                ):
+                    actions.append(dict(action))
+        return actions
 
     def calculate_native_eth_imbalance(self, actions: List[Dict], address: str) -> int:
         """Extract ETH imbalance from transfer actions."""
-        inflow = sum(Web3.to_int(hexstr=action.get('value', '0x0')) for action in actions if Web3.to_checksum_address(action.get('to', '')) == address)
-        outflow = sum(Web3.to_int(hexstr=action.get('value', '0x0')) for action in actions if Web3.to_checksum_address(action.get('from', '')) == address)
+        # inflow is the total value transferred to CoW contract
+        inflow = sum(
+            _to_int(action['value'])
+            for action in actions
+            if Web3.to_checksum_address(action.get('to', '')) == address
+        )
+        # outflow is the total value transferred out of CoW contract
+        outflow = sum(
+            _to_int(action['value'])
+            for action in actions
+            if Web3.to_checksum_address(action.get('from', '')) == address
+        )
         return inflow - outflow
 
     def extract_events(self, tx_receipt: Dict) -> Dict[str, List[Dict]]:
         """Extract relevant events from the transaction receipt."""
         event_topics = compute_event_topics(self.web3)
+        # transfer_topics are filtered to find imbalances for most ERC-20 tokens
         transfer_topics = {k: v for k, v in event_topics.items() if k in ['Transfer', 'ERC20Transfer']}
+        # other_topics is used to find imbalances for SDAI, ETH txss
         other_topics = {k: v for k, v in event_topics.items() if k not in transfer_topics}
 
         events = {name: [] for name in EVENT_TOPICS}
@@ -97,30 +140,6 @@ class RawTokenImbalances:
             print(f"Error decoding event: {str(e)}")
             return None, None, None
 
-    def decode_sdai_event(self, event: Dict) -> int | None:
-        """Decode sDAI event."""
-        try:
-            value_hex = event['data'][-30:]
-            
-            if isinstance(value_hex, bytes):
-                value = int.from_bytes(value_hex, byteorder='big')
-            else:
-                value = int(value_hex, 16)
-            return value
-        except Exception as e:
-            print(f"Error decoding sDAI event: {str(e)}")
-            return None
-
-    def get_transaction_receipt(self, tx_hash: str) -> Optional[Dict]:
-        """
-        Get the transaction receipt from the provided web3 instance.
-        """
-        try:
-            return self.web3.eth.get_transaction_receipt(tx_hash)
-        except Exception as e:
-            print(f"Error getting transaction receipt: {e}")
-            return None
-
     def process_event(self, event: Dict, inflows: Dict[str, int], outflows: Dict[str, int], address: str) -> None:
         """Process a single event to update inflows and outflows."""
         from_address, to_address, value = self.decode_event(event)
@@ -130,16 +149,6 @@ class RawTokenImbalances:
             inflows[event['address']] = inflows.get(event['address'], 0) + value
         if from_address == address:
             outflows[event['address']] = outflows.get(event['address'], 0) + value
-
-    def process_sdai_event(self, event: Dict, imbalances: Dict[str, int], is_deposit: bool) -> None:
-        """Process an sDAI deposit or withdrawal event to update imbalances."""
-        decoded_event_value = self.decode_sdai_event(event)
-        if decoded_event_value is None:
-            return
-        if is_deposit:
-            imbalances[SDAI_TOKEN_ADDRESS] = imbalances.get(SDAI_TOKEN_ADDRESS, 0) + decoded_event_value
-        else:
-            imbalances[SDAI_TOKEN_ADDRESS] = imbalances.get(SDAI_TOKEN_ADDRESS, 0) - decoded_event_value
 
     def calculate_imbalances(self, events: Dict[str, List[Dict]], address: str) -> Dict[str, int]:
         """Calculate token imbalances from events."""
@@ -169,6 +178,29 @@ class RawTokenImbalances:
         if native_eth_imbalance is not None:
             imbalances[NATIVE_ETH_TOKEN_ADDRESS] = native_eth_imbalance
 
+    def decode_sdai_event(self, event: Dict) -> int | None:
+        """Decode sDAI event."""
+        try:
+            value_hex = event['data'][-30:]
+            if isinstance(value_hex, bytes):
+                value = int.from_bytes(value_hex, byteorder='big')
+            else:
+                value = int(value_hex, 16)
+            return value
+        except Exception as e:
+            print(f"Error decoding sDAI event: {str(e)}")
+            return None
+
+    def process_sdai_event(self, event: Dict, imbalances: Dict[str, int], is_deposit: bool) -> None:
+        """Process an sDAI deposit or withdrawal event to update imbalances."""
+        decoded_event_value = self.decode_sdai_event(event)
+        if decoded_event_value is None:
+            return
+        if is_deposit:
+            imbalances[SDAI_TOKEN_ADDRESS] = imbalances.get(SDAI_TOKEN_ADDRESS, 0) + decoded_event_value
+        else:
+            imbalances[SDAI_TOKEN_ADDRESS] = imbalances.get(SDAI_TOKEN_ADDRESS, 0) - decoded_event_value
+
     def update_sdai_imbalance(self, events: Dict[str, List[Dict]], imbalances: Dict[str, int]) -> None:
         """Update the sDAI imbalance in imbalances."""
         for event in events['DepositSDAI']:
@@ -183,8 +215,7 @@ class RawTokenImbalances:
         tx_receipt = self.get_transaction_receipt(tx_hash)
         if tx_receipt is None:
             raise ValueError(f"Transaction hash {tx_hash} not found on chain {self.chain_name}.")
-
-        traces = self.get_transaction_trace(tx_hash, CHAIN_RPC_ENDPOINTS[self.chain_name])
+        traces = self.get_transaction_trace(tx_hash)
         native_eth_imbalance = None
         actions = []
         if traces is not None:
@@ -201,28 +232,6 @@ class RawTokenImbalances:
         self.update_sdai_imbalance(events, imbalances)
 
         return imbalances
-
-def compute_event_topics(web3: Web3) -> Dict[str, str]:
-    """Compute the event topics for all relevant events."""
-    return {name: web3.keccak(text=text).hex() for name, text in EVENT_TOPICS.items()}
-
-def find_chain_with_tx(tx_hash: str) -> Tuple[str, Web3]:
-    """
-    Find the chain where the transaction is present.
-    Returns the chain name and the web3 instance.
-    """
-    for chain_name, url in CHAIN_RPC_ENDPOINTS.items():
-        web3 = Web3(Web3.HTTPProvider(url))
-        if not web3.is_connected():
-            print(f"Could not connect to {chain_name}.")
-            continue
-        try:
-            web3.eth.get_transaction_receipt(tx_hash)
-            print(f"Transaction found on {chain_name}.")
-            return chain_name, web3
-        except Exception as e:
-            print(f"Transaction not found on {chain_name}: {e}")
-    raise ValueError(f"Transaction hash {tx_hash} not found on any chain.")
 
 # main method for finding imbalance for a single tx hash
 def main() -> None:
