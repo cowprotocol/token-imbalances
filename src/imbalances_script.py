@@ -20,7 +20,7 @@ def compute_event_topics(web3: Web3) -> Dict[str, str]:
 def find_chain_with_tx(tx_hash: str) -> Tuple[str, Web3]:
     """
     Find the chain where the transaction is present.
-    Returns the chain name and the web3 instance.
+    Returns the chain name and the web3 instance. Used for checking single tx hashes.
     """
     for chain_name, url in CHAIN_RPC_ENDPOINTS.items():
         web3 = Web3(Web3.HTTPProvider(url))
@@ -58,6 +58,7 @@ class RawTokenImbalances:
             return None
 
     def get_transaction_trace(self, tx_hash: str) -> Optional[List[Dict]]:
+        """ Function used for retreiving trace to identify ETH transfers. """
         try:
             res = self.web3.tracing.trace_transaction(tx_hash)
             return res
@@ -65,14 +66,17 @@ class RawTokenImbalances:
             print(f"Error occurred while fetching transaction trace: {err}")
             return None
 
-    def extract_actions(self, traces: List[AttributeDict], address: str, input_field: str = '0x') -> List[Dict]:
-        """Identify transfer events in trace involving the specified contract."""
+    def extract_actions(self, traces: List[AttributeDict], address: str) -> List[Dict]:
+        """ Identify transfer events in trace involving the specified contract. """
         normalized_address = Web3.to_checksum_address(address)
         actions = []
+        # input_field = '0x' denotes a native ETH transfer event, which we want to filter for
+        input_field: str = '0x'
         for trace in traces:
             if isinstance(trace, AttributeDict):
                 action = trace.get('action', {})
                 input_value = action.get('input', b"").hex()
+                # filter out action if involved in an ETH transfer event
                 if input_value == input_field and (
                     Web3.to_checksum_address(action.get('from', '')) == normalized_address or
                     Web3.to_checksum_address(action.get('to', '')) == normalized_address
@@ -105,7 +109,6 @@ class RawTokenImbalances:
         other_topics = {k: v for k, v in event_topics.items() if k not in transfer_topics}
 
         events = {name: [] for name in EVENT_TOPICS}
-
         for log in tx_receipt['logs']:
             log_topic = log['topics'][0].hex()
             if log_topic in transfer_topics.values():
@@ -181,6 +184,7 @@ class RawTokenImbalances:
     def decode_sdai_event(self, event: Dict) -> int | None:
         """Decode sDAI event."""
         try:
+            # SDAI event has hex value at the end, which needs to be extracted
             value_hex = event['data'][-30:]
             if isinstance(value_hex, bytes):
                 value = int.from_bytes(value_hex, byteorder='big')
@@ -215,6 +219,7 @@ class RawTokenImbalances:
         tx_receipt = self.get_transaction_receipt(tx_hash)
         if tx_receipt is None:
             raise ValueError(f"Transaction hash {tx_hash} not found on chain {self.chain_name}.")
+        # find trace and actions from trace to track native ETH events
         traces = self.get_transaction_trace(tx_hash)
         native_eth_imbalance = None
         actions = []
