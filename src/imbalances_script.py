@@ -1,3 +1,25 @@
+"""
+Steps for computing token imbalances:
+
+1. Get transaction receipt via tx hash -> get_transaction_receipt()
+2. Obtain the transaction trace and extract actions from trace to identify actions 
+   related to native ETH transfers -> get_transaction_trace() and extract_actions()
+3. Calculate ETH imbalance via actions by identifying transfers in 
+   and out of a contract address -> calculate_native_eth_imbalance()
+4. Extract and categorize relevant events (such as ERC20 transfers, WETH withdrawals, 
+   and sDAI transactions) from the transaction receipt. -> extract_events()
+5. Process each event by first decoding it to retrieve event details, i.e. to_address, from_address
+   and transfer value -> decode_event()
+6. If to_address or from_address match the contract address parameter, update inflows/outflows by 
+   adding the transfer value to existing inflow/outflow for the token addresses.
+7. Returning to calculate_imbalances(), which finds the imbalance for all token addresses using
+   inflow-outflow.
+8. If actions are not None, it denotes an ETH transfer event, which involves reducing WETH withdrawal
+   amount- > update_weth_imbalance(). The ETH imbalance is also calculated via -> update_native_eth_imbalance().
+9. update_sdai_imbalance() is called in each iteration and only completes if there is an SDAI transfer
+   involved which has special handling for its events.
+"""
+
 from web3.datastructures import AttributeDict
 from typing import Dict, List, Optional, Tuple
 from web3 import Web3
