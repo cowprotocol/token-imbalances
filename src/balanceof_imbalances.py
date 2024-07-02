@@ -1,3 +1,8 @@
+import sys
+import os
+# for debugging purposes 
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 from web3 import Web3
 from typing import Dict, Optional, Set
 from src.config import ETHEREUM_NODE_URL
@@ -32,7 +37,8 @@ class BalanceOfImbalances:
         token_addresses = set()
         transfer_topics = {
             self.web3.keccak(text="Transfer(address,address,uint256)").hex(),
-            self.web3.keccak(text="ERC20Transfer(address,address,uint256)").hex()
+            self.web3.keccak(text="ERC20Transfer(address,address,uint256)").hex(),
+            self.web3.keccak(text="Withdrawal(address,uint256)").hex()
         }
         for log in tx_receipt['logs']:
             if log['topics'][0].hex() in transfer_topics:

@@ -86,13 +86,13 @@ class RawTokenImbalances:
 
     def calculate_native_eth_imbalance(self, actions: List[Dict], address: str) -> int:
         """Extract ETH imbalance from transfer actions."""
-        # inflow is the total value transferred to CoW contract
+        # inflow is the total value transferred to address param
         inflow = sum(
             _to_int(action['value'])
             for action in actions
             if Web3.to_checksum_address(action.get('to', '')) == address
         )
-        # outflow is the total value transferred out of CoW contract
+        # outflow is the total value transferred out of address param
         outflow = sum(
             _to_int(action['value'])
             for action in actions

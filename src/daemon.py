@@ -18,11 +18,11 @@ def get_finalized_block_number(web3: Web3) -> int:
 def create_db_connection(chain_name: str):
     """function that creates a connection to the CoW db.""" 
     if chain_name == 'Ethereum':
-        prod_url = os.getenv("ETHEREUM_DB_URL")
+        db_url = os.getenv("ETHEREUM_DB_URL")
     elif chain_name == 'Gnosis':
-        prod_url = os.getenv("GNOSIS_DB_URL")
+        db_url = os.getenv("GNOSIS_DB_URL")
 
-    return create_engine(f"postgresql+psycopg2://{prod_url}")
+    return create_engine(f"postgresql+psycopg2://{db_url}")
 
 def fetch_transaction_hashes(db_connection: Engine, start_block: int, end_block: int) -> List[str]:
     """Fetch transaction hashes beginning start_block."""
@@ -33,11 +33,11 @@ def fetch_transaction_hashes(db_connection: Engine, start_block: int, end_block:
     AND block_number <= {end_block}
     """
 
-    prod_hashes = pd.read_sql(query, db_connection)
+    db_hashes = pd.read_sql(query, db_connection)
     # converts hashes at memory location to hex 
-    prod_hashes['tx_hash'] = prod_hashes['tx_hash'].apply(lambda x: f"0x{x.hex()}")
+    db_hashes['tx_hash'] = db_hashes['tx_hash'].apply(lambda x: f"0x{x.hex()}")
     
-    return prod_hashes['tx_hash'].tolist()
+    return db_hashes['tx_hash'].tolist()
 
 def process_transactions(chain_name: str) -> None:
     web3 = get_web3_instance(chain_name)
