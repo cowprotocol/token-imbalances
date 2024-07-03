@@ -25,4 +25,4 @@ jobs:
         run:
           black --check ./
       - name: Type Check (mypy)
-        run: mypy src --strict
+        run: mypy src

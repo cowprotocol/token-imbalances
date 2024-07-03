@@ -149,7 +149,7 @@ class RawTokenImbalances:
             k: v for k, v in event_topics.items() if k not in transfer_topics
         }
 
-        events = {name: [] for name in EVENT_TOPICS} # type: dict
+        events = {name: [] for name in EVENT_TOPICS}  # type: dict
         for log in tx_receipt["logs"]:
             log_topic = log["topics"][0].hex()
             if log_topic in transfer_topics.values():
@@ -210,7 +210,7 @@ class RawTokenImbalances:
         self, events: Dict[str, List[Dict]], address: str
     ) -> Dict[str, int]:
         """Calculate token imbalances from events."""
-        inflows, outflows = {}, {} # type: (dict, dict)
+        inflows, outflows = {}, {}  # type: (dict, dict)
         for event in events["Transfer"]:
             self.process_event(event, inflows, outflows, address)
 

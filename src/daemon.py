@@ -54,7 +54,7 @@ def process_transactions(chain_name: str) -> None:
     db_connection = create_db_connection(chain_name)
 
     previous_block = get_finalized_block_number(web3)
-    unprocessed_txs = [] # type: List
+    unprocessed_txs = []  # type: List
 
     print(f"{chain_name} Daemon started.")
 
