@@ -1,14 +1,58 @@
-# mypy: disable-error-code="import, arg-type"
-import os
+"""
+Running this daemon computes raw imbalances for finalized blocks by calling imbalances_script.py.
+"""
 import time
+import psycopg2
 import pandas as pd
 from web3 import Web3
 from typing import List
 from threading import Thread
-from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine
 from src.imbalances_script import RawTokenImbalances
-from src.config import CHAIN_RPC_ENDPOINTS, CHAIN_SLEEP_TIMES
+from src.config import (
+    CHAIN_RPC_ENDPOINTS,
+    CHAIN_SLEEP_TIMES,
+    create_read_db_connection,
+    create_write_db_connection,
+    logger,
+)
+
+
+def write_token_imbalances_to_db(
+    chain_name: str,
+    write_db_connection,
+    auction_id: int,
+    tx_hash: str,
+    token_address: str,
+    imbalance,
+):
+    try:
+        cursor = write_db_connection.cursor()
+        # Remove '0x' and then convert hex strings to bytes
+        tx_hash_bytes = bytes.fromhex(tx_hash[2:])
+        token_address_bytes = bytes.fromhex(token_address[2:])
+
+        insert_sql = """
+            INSERT INTO raw_token_imbalances (auction_id, chain_name, tx_hash, token_address, imbalance)
+            VALUES (%s, %s, %s, %s, %s)
+        """
+        cursor.execute(
+            insert_sql,
+            (
+                auction_id,
+                chain_name,
+                psycopg2.Binary(tx_hash_bytes),
+                psycopg2.Binary(token_address_bytes),
+                imbalance,
+            ),
+        )
+        write_db_connection.commit()
+
+        logger.info("Record inserted successfully.")
+    except psycopg2.Error as e:
+        logger.error(f"Error inserting record: {e}")
+    finally:
+        cursor.close()
 
 
 def get_web3_instance(chain_name: str) -> Web3:
@@ -19,72 +63,75 @@ def get_finalized_block_number(web3: Web3) -> int:
     return web3.eth.block_number - 64
 
 
-def create_db_connection(chain_name: str):
-    """function that creates a connection to the CoW db."""
-    if chain_name == "Ethereum":
-        db_url = os.getenv("ETHEREUM_DB_URL")
-    elif chain_name == "Gnosis":
-        db_url = os.getenv("GNOSIS_DB_URL")
-
-    return create_engine(f"postgresql+psycopg2://{db_url}")
-
-
 def fetch_transaction_hashes(
-    db_connection: Engine, start_block: int, end_block: int
+    read_db_connection: Engine, start_block: int, end_block: int
 ) -> List[str]:
     """Fetch transaction hashes beginning start_block."""
     query = f"""
-    SELECT tx_hash 
+    SELECT tx_hash, auction_id
     FROM settlements 
     WHERE block_number >= {start_block}
     AND block_number <= {end_block}
     """
 
-    db_hashes = pd.read_sql(query, db_connection)
+    db_data = pd.read_sql(query, read_db_connection)
     # converts hashes at memory location to hex
-    db_hashes["tx_hash"] = db_hashes["tx_hash"].apply(lambda x: f"0x{x.hex()}")
+    db_data["tx_hash"] = db_data["tx_hash"].apply(lambda x: f"0x{x.hex()}")
 
-    return db_hashes["tx_hash"].tolist()
+    # return db_hashes['tx_hash'].tolist(), db_hashes['auction_id'].tolist()
+    tx_hashes_auction_ids = [
+        (row["tx_hash"], row["auction_id"]) for index, row in db_data.iterrows()
+    ]
+    return tx_hashes_auction_ids
 
 
 def process_transactions(chain_name: str) -> None:
     web3 = get_web3_instance(chain_name)
     rt = RawTokenImbalances(web3, chain_name)
     sleep_time = CHAIN_SLEEP_TIMES.get(chain_name)
-    db_connection = create_db_connection(chain_name)
-
+    read_db_connection = create_read_db_connection(chain_name)
+    write_db_connection = create_write_db_connection()
     previous_block = get_finalized_block_number(web3)
-    unprocessed_txs = []  # type: List
+    unprocessed_txs = []
 
-    print(f"{chain_name} Daemon started.")
+    logger.info(f"{chain_name} Daemon started.")
 
     while True:
         try:
             latest_block = get_finalized_block_number(web3)
             new_txs = fetch_transaction_hashes(
-                db_connection, previous_block, latest_block
+                read_db_connection, previous_block, latest_block
             )
             # add any unprocessed hashes for processing, then clear list of unprocessed
             all_txs = new_txs + unprocessed_txs
             unprocessed_txs.clear()
 
-            for tx in all_txs:
-                print(f"Processing transaction on {chain_name}: {tx}")
+            for tx, auction_id in all_txs:
+                logger.info(f"Processing transaction on {chain_name}: {tx}")
                 try:
                     imbalances = rt.compute_imbalances(tx)
-                    print(f"Token Imbalances on {chain_name}:")
+                    logger.info(f"Token Imbalances on {chain_name}:")
                     for token_address, imbalance in imbalances.items():
-                        print(f"Token: {token_address}, Imbalance: {imbalance}")
+                        write_token_imbalances_to_db(
+                            chain_name,
+                            write_db_connection,
+                            auction_id,
+                            tx,
+                            token_address,
+                            imbalance,
+                        )
+                        logger.info(f"Token: {token_address}, Imbalance: {imbalance}")
                 except ValueError as e:
-                    print(e)
+                    logger.error(e)
                     unprocessed_txs.append(tx)
 
-            print("Done checks..")
             previous_block = latest_block + 1
         except ConnectionError as e:
-            print(f"Connection error processing transactions on {chain_name}: {e}")
+            logger.error(
+                f"Connection error processing transactions on {chain_name}: {e}"
+            )
         except Exception as e:
-            print(f"Error processing transactions on {chain_name}: {e}")
+            logger.error(f"Error processing transactions on {chain_name}: {e}")
 
         time.sleep(sleep_time)
 

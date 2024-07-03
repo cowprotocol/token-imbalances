@@ -1,10 +1,3 @@
-# mypy: disable-error-code="call-overload, arg-type, operator"
-import sys
-import os
-
-# for debugging purposes
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-
 from web3 import Web3
 from web3.types import TxReceipt
 from eth_typing import ChecksumAddress
