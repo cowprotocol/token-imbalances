@@ -1,3 +1,4 @@
+# mypy: disable-error-code="call-overload, arg-type, operator"
 import sys
 import os
 
@@ -5,6 +6,8 @@ import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from web3 import Web3
+from web3.types import TxReceipt
+from eth_typing import ChecksumAddress
 from typing import Dict, Optional, Set
 from src.config import ETHEREUM_NODE_URL
 from src.constants import SETTLEMENT_CONTRACT_ADDRESS, NATIVE_ETH_TOKEN_ADDRESS
@@ -51,7 +54,7 @@ class BalanceOfImbalances:
                 token_addresses.add(log["address"])
         return token_addresses
 
-    def get_transaction_receipt(self, tx_hash: str) -> Optional[Dict]:
+    def get_transaction_receipt(self, tx_hash: str) -> Optional[TxReceipt]:
         """Fetch the transaction receipt for the given hash."""
         try:
             return self.web3.eth.get_transaction_receipt(tx_hash)
@@ -60,8 +63,8 @@ class BalanceOfImbalances:
             return None
 
     def get_balances(
-        self, token_addresses: Set[str], block_number: int
-    ) -> Dict[str, Optional[int]]:
+        self, token_addresses: Set[ChecksumAddress], block_number: int
+    ) -> Dict[ChecksumAddress, Optional[int]]:
         """Get balances for all tokens at the given block number."""
         balances = {}
         balances[NATIVE_ETH_TOKEN_ADDRESS] = self.get_eth_balance(

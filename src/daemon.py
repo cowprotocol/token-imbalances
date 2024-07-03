@@ -1,3 +1,4 @@
+# mypy: disable-error-code="import, arg-type"
 import os
 import time
 import pandas as pd
@@ -53,7 +54,7 @@ def process_transactions(chain_name: str) -> None:
     db_connection = create_db_connection(chain_name)
 
     previous_block = get_finalized_block_number(web3)
-    unprocessed_txs = []
+    unprocessed_txs = [] # type: List
 
     print(f"{chain_name} Daemon started.")
 

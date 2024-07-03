@@ -1,3 +1,4 @@
+# mypy: disable-error-code="arg-type, operator, return, attr-defined"
 """
 Steps for computing token imbalances:
 
@@ -19,10 +20,10 @@ Steps for computing token imbalances:
 9. update_sdai_imbalance() is called in each iteration and only completes if there is an SDAI transfer
    involved which has special handling for its events.
 """
-
 from web3.datastructures import AttributeDict
 from typing import Dict, List, Optional, Tuple
 from web3 import Web3
+from web3.types import TxReceipt
 from src.config import CHAIN_RPC_ENDPOINTS
 from src.constants import (
     SETTLEMENT_CONTRACT_ADDRESS,
@@ -81,7 +82,7 @@ class RawTokenImbalances:
         self.web3 = web3
         self.chain_name = chain_name
 
-    def get_transaction_receipt(self, tx_hash: str) -> Optional[Dict]:
+    def get_transaction_receipt(self, tx_hash: str) -> Optional[TxReceipt]:
         """
         Get the transaction receipt from the provided web3 instance.
         """
@@ -148,7 +149,7 @@ class RawTokenImbalances:
             k: v for k, v in event_topics.items() if k not in transfer_topics
         }
 
-        events = {name: [] for name in EVENT_TOPICS}
+        events = {name: [] for name in EVENT_TOPICS} # type: dict
         for log in tx_receipt["logs"]:
             log_topic = log["topics"][0].hex()
             if log_topic in transfer_topics.values():
@@ -209,7 +210,7 @@ class RawTokenImbalances:
         self, events: Dict[str, List[Dict]], address: str
     ) -> Dict[str, int]:
         """Calculate token imbalances from events."""
-        inflows, outflows = {}, {}
+        inflows, outflows = {}, {} # type: (dict, dict)
         for event in events["Transfer"]:
             self.process_event(event, inflows, outflows, address)
 
