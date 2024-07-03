@@ -20,11 +20,11 @@ Steps for computing token imbalances:
 9. update_sdai_imbalance() is called in each iteration and only completes if there is an SDAI transfer
    involved which has special handling for its events.
 """
+from web3 import Web3
 from web3.datastructures import AttributeDict
 from typing import Dict, List, Optional, Tuple
-from web3 import Web3
 from web3.types import TxReceipt
-from src.config import CHAIN_RPC_ENDPOINTS
+from src.config import CHAIN_RPC_ENDPOINTS, logger
 from src.constants import (
     SETTLEMENT_CONTRACT_ADDRESS,
     NATIVE_ETH_TOKEN_ADDRESS,
@@ -54,14 +54,14 @@ def find_chain_with_tx(tx_hash: str) -> Tuple[str, Web3]:
     for chain_name, url in CHAIN_RPC_ENDPOINTS.items():
         web3 = Web3(Web3.HTTPProvider(url))
         if not web3.is_connected():
-            print(f"Could not connect to {chain_name}.")
+            logger.warning(f"Could not connect to {chain_name}.")
             continue
         try:
             web3.eth.get_transaction_receipt(tx_hash)
-            print(f"Transaction found on {chain_name}.")
+            logger.info(f"Transaction found on {chain_name}.")
             return chain_name, web3
         except Exception as e:
-            print(f"Transaction not found on {chain_name}: {e}")
+            logger.debug(f"Transaction not found on {chain_name}: {e}")
     raise ValueError(f"Transaction hash {tx_hash} not found on any chain.")
 
 
@@ -74,7 +74,8 @@ def _to_int(value: str | int) -> int:
             else int(value)
         )
     except ValueError:
-        print(f"Error converting value {value} to integer.")
+        logger.error(f"Error converting value {value} to integer.")
+
 
 
 class RawTokenImbalances:
@@ -89,7 +90,7 @@ class RawTokenImbalances:
         try:
             return self.web3.eth.get_transaction_receipt(tx_hash)
         except Exception as e:
-            print(f"Error getting transaction receipt: {e}")
+            logger.error(f"Error getting transaction receipt: {e}")
             return None
 
     def get_transaction_trace(self, tx_hash: str) -> Optional[List[Dict]]:
@@ -98,7 +99,7 @@ class RawTokenImbalances:
             res = self.web3.tracing.trace_transaction(tx_hash)
             return res
         except Exception as err:
-            print(f"Error occurred while fetching transaction trace: {err}")
+            logger.error(f"Error occurred while fetching transaction trace: {err}")
             return None
 
     def extract_actions(self, traces: List[AttributeDict], address: str) -> List[Dict]:
@@ -149,7 +150,7 @@ class RawTokenImbalances:
             k: v for k, v in event_topics.items() if k not in transfer_topics
         }
 
-        events = {name: [] for name in EVENT_TOPICS}  # type: dict
+        events = {name: [] for name in EVENT_TOPICS}
         for log in tx_receipt["logs"]:
             log_topic = log["topics"][0].hex()
             if log_topic in transfer_topics.values():
@@ -187,7 +188,7 @@ class RawTokenImbalances:
             else:  # Withdrawal event
                 return from_address, None, value
         except Exception as e:
-            print(f"Error decoding event: {str(e)}")
+            logger.error(f"Error decoding event: {str(e)}")
             return None, None, None
 
     def process_event(
@@ -256,7 +257,7 @@ class RawTokenImbalances:
                 value = int(value_hex, 16)
             return value
         except Exception as e:
-            print(f"Error decoding sDAI event: {str(e)}")
+            logger.error(f"Error decoding sDAI event: {str(e)}")
             return None
 
     def process_sdai_event(
@@ -324,11 +325,12 @@ def main() -> None:
     rt = RawTokenImbalances(web3, chain_name)
     try:
         imbalances = rt.compute_imbalances(tx_hash)
-        print(f"Token Imbalances on {chain_name}:")
+        logger.info(f"Token Imbalances on {chain_name}:")
         for token_address, imbalance in imbalances.items():
-            print(f"Token: {token_address}, Imbalance: {imbalance}")
+            logger.info(f"Token: {token_address}, Imbalance: {imbalance}")
     except ValueError as e:
-        print(e)
+        logger.error(e)
+
 
 
 if __name__ == "__main__":
