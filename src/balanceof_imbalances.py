@@ -92,7 +92,11 @@ class BalanceOfImbalances:
                 prev_balances[token_address] is not None
                 and final_balances[token_address] is not None
             ):
-                imbalance = final_balances[token_address] - prev_balances[token_address]
+                prev_balance = prev_balances[token_address]
+                assert prev_balance is not None  # Ensure prev_balance is not None
+                final_balance = final_balances[token_address]
+                assert final_balance is not None  # Ensure final_balance is not None
+                imbalance = final_balance - prev_balance
                 imbalances[token_address] = imbalance
         return imbalances
 
