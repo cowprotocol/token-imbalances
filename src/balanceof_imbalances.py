@@ -40,7 +40,7 @@ class BalanceOfImbalances:
             return None
 
     def extract_token_addresses(
-        self, tx_receipt: Dict[Any, Any]
+        self, tx_receipt: TxReceipt
     ) -> Set[ChecksumAddress]:
         """Extract unique token addresses from 'Transfer' events in a transaction receipt."""
         token_addresses: Set[ChecksumAddress] = set()
