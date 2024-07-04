@@ -75,7 +75,7 @@ def get_finalized_block_number(web3: Web3) -> int:
 def fetch_transaction_hashes(
     read_db_connection: Engine, start_block: int, end_block: int
 ) -> List[str]:
-    """Fetch transaction hashes beginning from start_block to end_block. """
+    """Fetch transaction hashes beginning from start_block to end_block."""
     query = f"""
     SELECT tx_hash, auction_id
     FROM settlements 
@@ -132,7 +132,9 @@ def process_transactions(chain_name: str) -> None:
                             token_address,
                             imbalance,
                         )
-                        logger.info("Token: %s, Imbalance: %s", token_address, imbalance)
+                        logger.info(
+                            "Token: %s, Imbalance: %s", token_address, imbalance
+                        )
                 except ValueError as e:
                     logger.error("ValueError: %s", e)
                     unprocessed_txs.append(tx)

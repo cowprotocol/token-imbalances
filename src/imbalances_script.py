@@ -68,7 +68,6 @@ def find_chain_with_tx(tx_hash: str) -> Tuple[str, Web3]:
     raise ValueError(f"Transaction hash {tx_hash} not found on any chain.")
 
 
-
 def _to_int(value: str | int) -> int:
     """Convert hex string or integer to integer."""
     try:
@@ -324,7 +323,7 @@ class RawTokenImbalances:
 
 
 def main() -> None:
-    """ main function for finding imbalance for a single tx hash. """
+    """main function for finding imbalance for a single tx hash."""
     tx_hash = input("Enter transaction hash: ")
     chain_name, web3 = find_chain_with_tx(tx_hash)
     rt = RawTokenImbalances(web3, chain_name)
