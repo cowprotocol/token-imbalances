@@ -14,7 +14,10 @@ class BalanceOfImbalances:
         self.web3 = Web3(Web3.HTTPProvider(ETHEREUM_NODE_URL))
 
     def get_token_balance(
-        self, token_address: str, account: str, block_identifier: int
+        self,
+        token_address: ChecksumAddress,
+        account: ChecksumAddress,
+        block_identifier: int,
     ) -> Optional[int]:
         """Retrieve the ERC-20 token balance of an account at a given block."""
         token_contract = self.web3.eth.contract(address=token_address, abi=erc20_abi)
@@ -26,7 +29,9 @@ class BalanceOfImbalances:
             print(f"Error fetching balance for token {token_address}: {e}")
             return None
 
-    def get_eth_balance(self, account: str, block_identifier: int) -> Optional[int]:
+    def get_eth_balance(
+        self, account: ChecksumAddress, block_identifier: int
+    ) -> Optional[int]:
         """Get the ETH balance for a given account and block number."""
         try:
             return self.web3.eth.get_balance(account, block_identifier=block_identifier)
@@ -34,7 +39,9 @@ class BalanceOfImbalances:
             print(f"Error fetching ETH balance: {e}")
             return None
 
-    def extract_token_addresses(self, tx_receipt: Dict) -> Set[str]:
+    def extract_token_addresses(
+        self, tx_receipt: Dict[Any, Any]
+    ) -> Set[ChecksumAddress]:
         """Extract unique token addresses from 'Transfer' events in a transaction receipt."""
         token_addresses: Set[ChecksumAddress] = set()
         transfer_topics = {
@@ -47,7 +54,7 @@ class BalanceOfImbalances:
                 token_addresses.add(self.web3.to_checksum_address(log["address"]))
         return token_addresses
 
-    def get_transaction_receipt(self, tx_hash: str) -> Optional[TxReceipt]:
+    def get_transaction_receipt(self, tx_hash: HexStr) -> Optional[TxReceipt]:
         """Fetch the transaction receipt for the given hash."""
         try:
             return self.web3.eth.get_transaction_receipt(tx_hash)
@@ -60,13 +67,17 @@ class BalanceOfImbalances:
     ) -> Dict[ChecksumAddress, Optional[int]]:
         """Get balances for all tokens at the given block number."""
         balances: Dict[ChecksumAddress, Optional[int]] = {}
-        balances[NATIVE_ETH_TOKEN_ADDRESS] = self.get_eth_balance(
-            SETTLEMENT_CONTRACT_ADDRESS, block_number
+        balances[
+            self.web3.to_checksum_address(NATIVE_ETH_TOKEN_ADDRESS)
+        ] = self.get_eth_balance(
+            self.web3.to_checksum_address(SETTLEMENT_CONTRACT_ADDRESS), block_number
         )
 
         for token_address in token_addresses:
             balances[token_address] = self.get_token_balance(
-                token_address, SETTLEMENT_CONTRACT_ADDRESS, block_number
+                token_address,
+                self.web3.to_checksum_address(SETTLEMENT_CONTRACT_ADDRESS),
+                block_number,
             )
 
         return balances
@@ -75,9 +86,9 @@ class BalanceOfImbalances:
         self,
         prev_balances: Dict[ChecksumAddress, Optional[int]],
         final_balances: Dict[ChecksumAddress, Optional[int]],
-    ) -> Dict[str, int]:
+    ) -> Dict[ChecksumAddress, int]:
         """Calculate imbalances between previous and final balances."""
-        imbalances = {}
+        imbalances: Dict[ChecksumAddress, int] = {}
         for token_address in prev_balances:
             if (
                 prev_balances[token_address] is not None
