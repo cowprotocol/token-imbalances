@@ -1,7 +1,7 @@
 from web3 import Web3
-from web3.types import TxReceipt
+from web3.types import TxReceipt, HexStr
 from eth_typing import ChecksumAddress
-from typing import Dict, Optional, Set
+from typing import Dict, Optional, Set, Any
 from src.config import ETHEREUM_NODE_URL
 from src.constants import SETTLEMENT_CONTRACT_ADDRESS, NATIVE_ETH_TOKEN_ADDRESS
 from contracts.erc20_abi import erc20_abi
@@ -36,7 +36,7 @@ class BalanceOfImbalances:
 
     def extract_token_addresses(self, tx_receipt: Dict) -> Set[str]:
         """Extract unique token addresses from 'Transfer' events in a transaction receipt."""
-        token_addresses = set()
+        token_addresses: Set[ChecksumAddress] = set()
         transfer_topics = {
             self.web3.keccak(text="Transfer(address,address,uint256)").hex(),
             self.web3.keccak(text="ERC20Transfer(address,address,uint256)").hex(),
@@ -44,7 +44,7 @@ class BalanceOfImbalances:
         }
         for log in tx_receipt["logs"]:
             if log["topics"][0].hex() in transfer_topics:
-                token_addresses.add(log["address"])
+                token_addresses.add(self.web3.to_checksum_address(log["address"]))
         return token_addresses
 
     def get_transaction_receipt(self, tx_hash: str) -> Optional[TxReceipt]:
@@ -59,7 +59,7 @@ class BalanceOfImbalances:
         self, token_addresses: Set[ChecksumAddress], block_number: int
     ) -> Dict[ChecksumAddress, Optional[int]]:
         """Get balances for all tokens at the given block number."""
-        balances = {}
+        balances: Dict[ChecksumAddress, Optional[int]] = {}
         balances[NATIVE_ETH_TOKEN_ADDRESS] = self.get_eth_balance(
             SETTLEMENT_CONTRACT_ADDRESS, block_number
         )
@@ -73,8 +73,8 @@ class BalanceOfImbalances:
 
     def calculate_imbalances(
         self,
-        prev_balances: Dict[str, Optional[int]],
-        final_balances: Dict[str, Optional[int]],
+        prev_balances: Dict[ChecksumAddress, Optional[int]],
+        final_balances: Dict[ChecksumAddress, Optional[int]],
     ) -> Dict[str, int]:
         """Calculate imbalances between previous and final balances."""
         imbalances = {}
@@ -87,7 +87,7 @@ class BalanceOfImbalances:
                 imbalances[token_address] = imbalance
         return imbalances
 
-    def compute_imbalances(self, tx_hash: str) -> Dict[str, int]:
+    def compute_imbalances(self, tx_hash: HexStr) -> Dict[ChecksumAddress, int]:
         """Compute token imbalances before and after a transaction."""
         tx_receipt = self.get_transaction_receipt(tx_hash)
         if tx_receipt is None:

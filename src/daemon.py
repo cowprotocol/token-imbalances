@@ -2,11 +2,12 @@
 Running this daemon computes raw imbalances for finalized blocks by calling imbalances_script.py.
 """
 import time
-from typing import List, Tuple
+from typing import List, Tuple, Dict, Any
 from threading import Thread
 import psycopg2
 import pandas as pd
 from web3 import Web3
+from web3.types import ChecksumAddress, HexStr, TxReceipt
 from sqlalchemy.engine import Engine
 from src.imbalances_script import RawTokenImbalances
 from src.config import (
@@ -20,12 +21,12 @@ from src.config import (
 
 def write_token_imbalances_to_db(
     chain_name: str,
-    write_db_connection,
+    write_db_connection: Any,
     auction_id: int,
     tx_hash: str,
     token_address: str,
-    imbalance,
-):
+    imbalance: float,
+) -> None:
     """
     Write token imbalances to the database.
     """
@@ -74,7 +75,7 @@ def get_finalized_block_number(web3: Web3) -> int:
 
 def fetch_transaction_hashes(
     read_db_connection: Engine, start_block: int, end_block: int
-) -> List[str]:
+) -> List[Tuple[str, int]]:
     """Fetch transaction hashes beginning from start_block to end_block."""
     query = f"""
     SELECT tx_hash, auction_id
@@ -87,11 +88,9 @@ def fetch_transaction_hashes(
     # converts hashes at memory location to hex
     db_data["tx_hash"] = db_data["tx_hash"].apply(lambda x: f"0x{x.hex()}")
 
-    # return db_hashes['tx_hash'].tolist(), db_hashes['auction_id'].tolist()
-    tx_hashes_auction_ids = [
-        (row["tx_hash"], row["auction_id"]) for index, row in db_data.iterrows()
-    ]
-    return tx_hashes_auction_ids
+    # return (tx hash, auction id) as tx_data
+    tx_data = [(row["tx_hash"], row["auction_id"]) for index, row in db_data.iterrows()]
+    return tx_data
 
 
 def process_transactions(chain_name: str) -> None:
@@ -104,7 +103,7 @@ def process_transactions(chain_name: str) -> None:
     read_db_connection = create_read_db_connection(chain_name)
     write_db_connection = create_write_db_connection()
     previous_block = get_finalized_block_number(web3)
-    unprocessed_txs = []
+    unprocessed_txs: List[Tuple[str, int]] = []
 
     logger.info("%s Daemon started.", chain_name)
 
@@ -137,7 +136,7 @@ def process_transactions(chain_name: str) -> None:
                         )
                 except ValueError as e:
                     logger.error("ValueError: %s", e)
-                    unprocessed_txs.append(tx)
+                    unprocessed_txs.append((tx, auction_id))
 
             previous_block = latest_block + 1
         except ConnectionError as e:
