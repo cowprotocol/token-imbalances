@@ -15,15 +15,18 @@ Steps for computing token imbalances:
    adding the transfer value to existing inflow/outflow for the token addresses.
 7. Returning to calculate_imbalances(), which finds the imbalance for all token addresses using
    inflow-outflow.
-8. If actions are not None, it denotes an ETH transfer event, which involves reducing WETH withdrawal
-   amount- > update_weth_imbalance(). The ETH imbalance is also calculated via -> update_native_eth_imbalance().
-9. update_sdai_imbalance() is called in each iteration and only completes if there is an SDAI transfer
-   involved which has special handling for its events.
+8. If actions are not None, it denotes an ETH transfer event, which involves reducing WETH 
+   withdrawal amount- > update_weth_imbalance(). The ETH imbalance is also calculated 
+   via -> update_native_eth_imbalance().
+9. update_sdai_imbalance() is called in each iteration and only completes if there is an SDAI 
+   transfer involved which has special handling for its events.
 """
+from typing import Dict, List, Optional, Tuple
+
 from web3 import Web3
 from web3.datastructures import AttributeDict
-from typing import Dict, List, Optional, Tuple
 from web3.types import TxReceipt
+
 from src.config import CHAIN_RPC_ENDPOINTS, logger
 from src.constants import (
     SETTLEMENT_CONTRACT_ADDRESS,
@@ -54,15 +57,16 @@ def find_chain_with_tx(tx_hash: str) -> Tuple[str, Web3]:
     for chain_name, url in CHAIN_RPC_ENDPOINTS.items():
         web3 = Web3(Web3.HTTPProvider(url))
         if not web3.is_connected():
-            logger.warning(f"Could not connect to {chain_name}.")
+            logger.warning("Could not connect to %s.", chain_name)
             continue
         try:
             web3.eth.get_transaction_receipt(tx_hash)
-            logger.info(f"Transaction found on {chain_name}.")
+            logger.info("Transaction found on %s.", chain_name)
             return chain_name, web3
-        except Exception as e:
-            logger.debug(f"Transaction not found on {chain_name}: {e}")
+        except Exception as ex:
+            logger.debug("Transaction not found on %s: %s", chain_name, ex)
     raise ValueError(f"Transaction hash {tx_hash} not found on any chain.")
+
 
 
 def _to_int(value: str | int) -> int:
@@ -74,11 +78,12 @@ def _to_int(value: str | int) -> int:
             else int(value)
         )
     except ValueError:
-        logger.error(f"Error converting value {value} to integer.")
-
+        logger.error("Error converting value %s to integer.", value)
 
 
 class RawTokenImbalances:
+    """Class for computing token imbalances."""
+
     def __init__(self, web3: Web3, chain_name: str):
         self.web3 = web3
         self.chain_name = chain_name
@@ -89,8 +94,8 @@ class RawTokenImbalances:
         """
         try:
             return self.web3.eth.get_transaction_receipt(tx_hash)
-        except Exception as e:
-            logger.error(f"Error getting transaction receipt: {e}")
+        except Exception as ex:
+            logger.error("Error getting transaction receipt: %s", ex)
             return None
 
     def get_transaction_trace(self, tx_hash: str) -> Optional[List[Dict]]:
@@ -99,7 +104,7 @@ class RawTokenImbalances:
             res = self.web3.tracing.trace_transaction(tx_hash)
             return res
         except Exception as err:
-            logger.error(f"Error occurred while fetching transaction trace: {err}")
+            logger.error("Error occurred while fetching transaction trace: %s", err)
             return None
 
     def extract_actions(self, traces: List[AttributeDict], address: str) -> List[Dict]:
@@ -188,7 +193,7 @@ class RawTokenImbalances:
             else:  # Withdrawal event
                 return from_address, None, value
         except Exception as e:
-            logger.error(f"Error decoding event: {str(e)}")
+            logger.error("Error decoding event: %s", str(e))
             return None, None, None
 
     def process_event(
@@ -318,8 +323,8 @@ class RawTokenImbalances:
         return imbalances
 
 
-# main method for finding imbalance for a single tx hash
 def main() -> None:
+    """ main function for finding imbalance for a single tx hash. """
     tx_hash = input("Enter transaction hash: ")
     chain_name, web3 = find_chain_with_tx(tx_hash)
     rt = RawTokenImbalances(web3, chain_name)
@@ -330,7 +335,6 @@ def main() -> None:
             logger.info(f"Token: {token_address}, Imbalance: {imbalance}")
     except ValueError as e:
         logger.error(e)
-
 
 
 if __name__ == "__main__":

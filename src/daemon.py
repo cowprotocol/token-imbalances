@@ -2,11 +2,11 @@
 Running this daemon computes raw imbalances for finalized blocks by calling imbalances_script.py.
 """
 import time
+from typing import List, Tuple
+from threading import Thread
 import psycopg2
 import pandas as pd
 from web3 import Web3
-from typing import List
-from threading import Thread
 from sqlalchemy.engine import Engine
 from src.imbalances_script import RawTokenImbalances
 from src.config import (
@@ -26,6 +26,9 @@ def write_token_imbalances_to_db(
     token_address: str,
     imbalance,
 ):
+    """
+    Write token imbalances to the database.
+    """
     try:
         cursor = write_db_connection.cursor()
         # Remove '0x' and then convert hex strings to bytes
@@ -50,23 +53,29 @@ def write_token_imbalances_to_db(
 
         logger.info("Record inserted successfully.")
     except psycopg2.Error as e:
-        logger.error(f"Error inserting record: {e}")
+        logger.error("Error inserting record: %s", e)
     finally:
         cursor.close()
 
 
 def get_web3_instance(chain_name: str) -> Web3:
+    """
+    returns a Web3 instance for the given blockchain via chain name.
+    """
     return Web3(Web3.HTTPProvider(CHAIN_RPC_ENDPOINTS[chain_name]))
 
 
 def get_finalized_block_number(web3: Web3) -> int:
+    """
+    Get the number of the most recent finalized block.
+    """
     return web3.eth.block_number - 64
 
 
 def fetch_transaction_hashes(
     read_db_connection: Engine, start_block: int, end_block: int
 ) -> List[str]:
-    """Fetch transaction hashes beginning start_block."""
+    """Fetch transaction hashes beginning from start_block to end_block. """
     query = f"""
     SELECT tx_hash, auction_id
     FROM settlements 
@@ -86,6 +95,9 @@ def fetch_transaction_hashes(
 
 
 def process_transactions(chain_name: str) -> None:
+    """
+    Process transactions to compute imbalances for a given blockchain via chain name.
+    """
     web3 = get_web3_instance(chain_name)
     rt = RawTokenImbalances(web3, chain_name)
     sleep_time = CHAIN_SLEEP_TIMES.get(chain_name)
@@ -94,7 +106,7 @@ def process_transactions(chain_name: str) -> None:
     previous_block = get_finalized_block_number(web3)
     unprocessed_txs = []
 
-    logger.info(f"{chain_name} Daemon started.")
+    logger.info("%s Daemon started.", chain_name)
 
     while True:
         try:
@@ -107,10 +119,10 @@ def process_transactions(chain_name: str) -> None:
             unprocessed_txs.clear()
 
             for tx, auction_id in all_txs:
-                logger.info(f"Processing transaction on {chain_name}: {tx}")
+                logger.info("Processing transaction on %s: %s", chain_name, tx)
                 try:
                     imbalances = rt.compute_imbalances(tx)
-                    logger.info(f"Token Imbalances on {chain_name}:")
+                    logger.info("Token Imbalances on %s:", chain_name)
                     for token_address, imbalance in imbalances.items():
                         write_token_imbalances_to_db(
                             chain_name,
@@ -120,23 +132,26 @@ def process_transactions(chain_name: str) -> None:
                             token_address,
                             imbalance,
                         )
-                        logger.info(f"Token: {token_address}, Imbalance: {imbalance}")
+                        logger.info("Token: %s, Imbalance: %s", token_address, imbalance)
                 except ValueError as e:
-                    logger.error(e)
+                    logger.error("ValueError: %s", e)
                     unprocessed_txs.append(tx)
 
             previous_block = latest_block + 1
         except ConnectionError as e:
             logger.error(
-                f"Connection error processing transactions on {chain_name}: {e}"
+                "Connection error processing transactions on %s: %s", chain_name, e
             )
         except Exception as e:
-            logger.error(f"Error processing transactions on {chain_name}: {e}")
+            logger.error("Error processing transactions on %s: %s", chain_name, e)
 
         time.sleep(sleep_time)
 
 
 def main() -> None:
+    """
+    Main function to start the daemon threads for each blockchain.
+    """
     threads = []
 
     for chain_name in CHAIN_RPC_ENDPOINTS.keys():
