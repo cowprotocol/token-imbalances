@@ -154,7 +154,7 @@ class RawTokenImbalances:
             k: v for k, v in event_topics.items() if k not in transfer_topics
         }
 
-        events = {name: [] for name in EVENT_TOPICS}
+        events: Dict[str, List[Dict]] = {name: [] for name in EVENT_TOPICS}
         for log in tx_receipt["logs"]:
             log_topic = log["topics"][0].hex()
             if log_topic in transfer_topics.values():

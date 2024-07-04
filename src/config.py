@@ -14,7 +14,7 @@ SOLVER_SLIPPAGE_DB_URL = os.getenv("SOLVER_SLIPPAGE_DB_URL")
 CHAIN_RPC_ENDPOINTS = {"Ethereum": ETHEREUM_NODE_URL, "Gnosis": GNOSIS_NODE_URL}
 
 # sleep time can be configured here
-CHAIN_SLEEP_TIMES = {"Ethereum": 60, "Gnosis": 120}
+CHAIN_SLEEP_TIMES = {"Ethereum": 60.0, "Gnosis": 120.0}
 
 
 def create_read_db_connection(chain_name: str):
