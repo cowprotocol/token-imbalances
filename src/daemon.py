@@ -145,8 +145,8 @@ def process_transactions(chain_name: str) -> None:
             )
         except Exception as e:
             logger.error("Error processing transactions on %s: %s", chain_name, e)
-
-        time.sleep(sleep_time)
+        if sleep_time is not None:
+            time.sleep(sleep_time)
 
 
 def main() -> None:
