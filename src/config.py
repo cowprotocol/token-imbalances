@@ -12,9 +12,22 @@ GNOSIS_NODE_URL = os.getenv("GNOSIS_NODE_URL")
 
 CHAIN_RPC_ENDPOINTS = {"Ethereum": ETHEREUM_NODE_URL, "Gnosis": GNOSIS_NODE_URL}
 
+
+# function for safe conversion to float (prevents None -> float conversion issues raised by mypy)
+def get_env_float(var_name: str) -> float:
+    """Retrieve environment variable and convert to float. Raise an error if not set."""
+    value = os.getenv(var_name)
+    if value is None:
+        raise ValueError(f"Environment variable {var_name} is not set.")
+    try:
+        return float(value)
+    except ValueError:
+        raise ValueError(f"Environment variable {var_name} must be a float.")
+
+
 CHAIN_SLEEP_TIMES = {
-    "Ethereum": float(os.getenv("ETHEREUM_SLEEP_TIME")),
-    "Gnosis": float(os.getenv("GNOSIS_SLEEP_TIME")),
+    "Ethereum": get_env_float("ETHEREUM_SLEEP_TIME"),
+    "Gnosis": get_env_float("GNOSIS_SLEEP_TIME"),
 }
 
 
@@ -25,6 +38,9 @@ def create_read_db_connection(chain_name: str) -> Engine:
     elif chain_name == "Gnosis":
         read_db_url = os.getenv("GNOSIS_DB_URL")
 
+    if not read_db_url:
+        raise ValueError(f"No database URL found for chain: {chain_name}")
+
     return create_engine(f"postgresql+psycopg2://{read_db_url}")
 
 
@@ -32,6 +48,9 @@ def create_write_db_connection() -> Psycopg2Connection:
     """Function that creates a connection to the write database."""
 
     parsed_url = urlparse(os.getenv("SOLVER_SLIPPAGE_DB_URL"))
+
+    if not parsed_url.hostname or not parsed_url.path:
+        raise ValueError("Invalid or missing write database URL")
 
     # Connect to the database
     write_db_connection = psycopg2.connect(

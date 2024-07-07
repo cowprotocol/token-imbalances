@@ -3,12 +3,11 @@ Running this daemon computes raw imbalances for finalized blocks by calling imba
 """
 
 import time
-from typing import List, Tuple, Dict, Any
+from typing import List, Tuple, Any
 from threading import Thread
 import psycopg2
 import pandas as pd
 from web3 import Web3
-from web3.types import ChecksumAddress, HexStr, TxReceipt
 from sqlalchemy.engine import Engine
 from src.imbalances_script import RawTokenImbalances
 from src.config import (
@@ -118,8 +117,8 @@ def fetch_transaction_hashes(
     query = f"""
     SELECT tx_hash, auction_id
     FROM settlements 
-    WHERE block_number >= 20201300
-    AND block_number <= 20201400
+    WHERE block_number >= {start_block}
+    AND block_number <= {end_block}
     """
 
     db_data = pd.read_sql(query, read_db_connection)
