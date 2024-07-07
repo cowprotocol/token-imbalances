@@ -1,6 +1,7 @@
 """
 Running this daemon computes raw imbalances for finalized blocks by calling imbalances_script.py.
 """
+
 import time
 from typing import List, Tuple, Dict, Any
 from threading import Thread
@@ -19,6 +20,36 @@ from src.config import (
 )
 
 
+def record_exists(
+    write_db_connection: Any,
+    tx_hash_bytes: bytes,
+    token_address_bytes: bytes,
+) -> bool:
+    """
+    Check if a record with the given (tx_hash, token_address) already exists in the database.
+    """
+    try:
+        cursor = write_db_connection.cursor()
+
+        # Check if the record exists
+        check_sql = """
+            SELECT 1 FROM raw_token_imbalances
+            WHERE tx_hash = %s AND token_address = %s
+        """
+        cursor.execute(
+            check_sql,
+            (psycopg2.Binary(tx_hash_bytes), psycopg2.Binary(token_address_bytes)),
+        )
+        record_exists = cursor.fetchone()
+
+        return record_exists is not None
+    except psycopg2.Error as e:
+        logger.error("Error checking record existence: %s", e)
+        return False
+    finally:
+        cursor.close()
+
+
 def write_token_imbalances_to_db(
     chain_name: str,
     write_db_connection: Any,
@@ -28,35 +59,42 @@ def write_token_imbalances_to_db(
     imbalance: float,
 ) -> None:
     """
-    Write token imbalances to the database.
+    Write token imbalances to the database if the (tx_hash, token_address) combination does not already exist.
     """
-    try:
-        cursor = write_db_connection.cursor()
-        # Remove '0x' and then convert hex strings to bytes
-        tx_hash_bytes = bytes.fromhex(tx_hash[2:])
-        token_address_bytes = bytes.fromhex(token_address[2:])
+    tx_hash_bytes = bytes.fromhex(tx_hash[2:])
+    token_address_bytes = bytes.fromhex(token_address[2:])
 
-        insert_sql = """
-            INSERT INTO raw_token_imbalances (auction_id, chain_name, tx_hash, token_address, imbalance)
-            VALUES (%s, %s, %s, %s, %s)
-        """
-        cursor.execute(
-            insert_sql,
-            (
-                auction_id,
-                chain_name,
-                psycopg2.Binary(tx_hash_bytes),
-                psycopg2.Binary(token_address_bytes),
-                imbalance,
-            ),
+    if not record_exists(write_db_connection, tx_hash_bytes, token_address_bytes):
+        try:
+            cursor = write_db_connection.cursor()
+            # Convert hex strings to bytes for database insertion
+
+            insert_sql = """
+                INSERT INTO raw_token_imbalances (auction_id, chain_name, tx_hash, token_address, imbalance)
+                VALUES (%s, %s, %s, %s, %s)
+            """
+            cursor.execute(
+                insert_sql,
+                (
+                    auction_id,
+                    chain_name,
+                    psycopg2.Binary(tx_hash_bytes),
+                    psycopg2.Binary(token_address_bytes),
+                    imbalance,
+                ),
+            )
+            write_db_connection.commit()
+            logger.info("Record inserted successfully.")
+        except psycopg2.Error as e:
+            logger.error("Error inserting record: %s", e)
+        finally:
+            cursor.close()
+    else:
+        logger.info(
+            "Record with tx_hash %s and token_address %s already exists.",
+            tx_hash,
+            token_address,
         )
-        write_db_connection.commit()
-
-        logger.info("Record inserted successfully.")
-    except psycopg2.Error as e:
-        logger.error("Error inserting record: %s", e)
-    finally:
-        cursor.close()
 
 
 def get_web3_instance(chain_name: str) -> Web3:
@@ -80,8 +118,8 @@ def fetch_transaction_hashes(
     query = f"""
     SELECT tx_hash, auction_id
     FROM settlements 
-    WHERE block_number >= {start_block}
-    AND block_number <= {end_block}
+    WHERE block_number >= 20201300
+    AND block_number <= 20201400
     """
 
     db_data = pd.read_sql(query, read_db_connection)
