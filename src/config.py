@@ -17,23 +17,23 @@ CHAIN_RPC_ENDPOINTS = {"Ethereum": ETHEREUM_NODE_URL, "Gnosis": GNOSIS_NODE_URL}
 logger = get_logger("raw_token_imbalances")
 
 
-def get_env_float(var_name: str) -> float:
+def get_env_int(var_name: str) -> int:
     """
-    Function for safe conversion to float (prevents None -> float conversion issues raised by mypy)
-    Retrieve environment variable and convert to float. Raise an error if not set.
+    Function for safe conversion to int (prevents None -> int conversion issues raised by mypy)
+    Retrieve environment variable and convert to int. Raise an error if not set.
     """
     value = os.getenv(var_name)
     if value is None:
         raise ValueError(f"Environment variable {var_name} is not set.")
     try:
-        return float(value)
+        return int(value)
     except ValueError:
-        raise ValueError(f"Environment variable {var_name} must be a float.")
+        raise ValueError(f"Environment variable {var_name} must be a int.")
 
 
 CHAIN_SLEEP_TIMES = {
-    "Ethereum": get_env_float("ETHEREUM_SLEEP_TIME"),
-    "Gnosis": get_env_float("GNOSIS_SLEEP_TIME"),
+    "Ethereum": get_env_int("ETHEREUM_SLEEP_TIME"),
+    "Gnosis": get_env_int("GNOSIS_SLEEP_TIME"),
 }
 
 
