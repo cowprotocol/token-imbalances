@@ -21,6 +21,7 @@ Steps for computing token imbalances:
 9. update_sdai_imbalance() is called in each iteration and only completes if there is an SDAI 
    transfer involved which has special handling for its events.
 """
+
 from typing import Dict, List, Optional, Tuple
 
 from web3 import Web3
@@ -291,35 +292,43 @@ class RawTokenImbalances:
             if event["address"] == SDAI_TOKEN_ADDRESS:
                 self.process_sdai_event(event, imbalances, is_deposit=False)
 
-    def compute_imbalances(self, tx_hash: str) -> Dict[str, int]:
-        """Compute token imbalances for a given transaction hash."""
-        tx_receipt = self.get_transaction_receipt(tx_hash)
-        if tx_receipt is None:
-            raise ValueError(
-                f"Transaction hash {tx_hash} not found on chain {self.chain_name}."
-            )
-        # find trace and actions from trace to track native ETH events
-        traces = self.get_transaction_trace(tx_hash)
-        native_eth_imbalance = None
-        actions = []
-        if traces is not None:
+    def compute_imbalances(self, tx_hash: str) -> Optional[Dict[str, int]]:
+        try:
+            tx_receipt = self.get_transaction_receipt(tx_hash)
+            if not tx_receipt:
+                logger.error("No transaction receipt found for %s", tx_hash)
+                return None
+
+            traces = self.get_transaction_trace(tx_hash)
+            if traces is None:
+                logger.error(
+                    "Error fetching transaction trace for %s. Marking transaction as unprocessed.",
+                    tx_hash,
+                )
+                return None
+
+            events = self.extract_events(tx_receipt)
+            imbalances = self.calculate_imbalances(events, SETTLEMENT_CONTRACT_ADDRESS)
+
+            native_eth_imbalance = None
+            actions = []
             actions = self.extract_actions(traces, SETTLEMENT_CONTRACT_ADDRESS)
             native_eth_imbalance = self.calculate_native_eth_imbalance(
                 actions, SETTLEMENT_CONTRACT_ADDRESS
             )
 
-        events = self.extract_events(tx_receipt)
-        imbalances = self.calculate_imbalances(events, SETTLEMENT_CONTRACT_ADDRESS)
+            if actions:
+                self.update_weth_imbalance(
+                    events, actions, imbalances, SETTLEMENT_CONTRACT_ADDRESS
+                )
+                self.update_native_eth_imbalance(imbalances, native_eth_imbalance)
 
-        if actions:
-            self.update_weth_imbalance(
-                events, actions, imbalances, SETTLEMENT_CONTRACT_ADDRESS
-            )
-            self.update_native_eth_imbalance(imbalances, native_eth_imbalance)
+            self.update_sdai_imbalance(events, imbalances)
+            return imbalances
 
-        self.update_sdai_imbalance(events, imbalances)
-
-        return imbalances
+        except Exception as e:
+            logger.error("Error computing imbalances for %s: %s", tx_hash, e)
+            return None
 
 
 def main() -> None:
@@ -329,9 +338,12 @@ def main() -> None:
     rt = RawTokenImbalances(web3, chain_name)
     try:
         imbalances = rt.compute_imbalances(tx_hash)
-        logger.info(f"Token Imbalances on {chain_name}:")
-        for token_address, imbalance in imbalances.items():
-            logger.info(f"Token: {token_address}, Imbalance: {imbalance}")
+        if imbalances is not None:
+            logger.info(f"Token Imbalances on {chain_name}:")
+            for token_address, imbalance in imbalances.items():
+                logger.info(f"Token: {token_address}, Imbalance: {imbalance}")
+        else:
+            raise ValueError("Imbalances computation returned None.")
     except ValueError as e:
         logger.error(e)
 
