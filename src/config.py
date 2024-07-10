@@ -62,9 +62,5 @@ def check_db_connection(connection: Engine, db_type: str) -> Engine:
                 conn.execute(text("SELECT 1"))
     except OperationalError:
         # if connection is closed, create new one
-        connection = (
-            create_db_connection("backend")
-            if db_type == "backend"
-            else create_db_connection("solver_slippage")
-        )
+        connection = create_db_connection(db_type)
     return connection
