@@ -9,3 +9,5 @@ mypy==1.4.1
 pylint==3.2.5
 pytest==7.4.0
 setuptools
+pandas-stubs
+types-psycopg2
