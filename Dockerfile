@@ -1,5 +1,6 @@
 FROM python:3.12
-COPY requirements.txt .
+WORKDIR /app
+COPY . /app
 RUN python -m pip install -r requirements.txt
-COPY . .
-CMD python -m src.daemon
+ENV PYTHONBUFFERED=1 
+CMD ["python", "-m", "src.daemon"]

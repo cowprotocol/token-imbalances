@@ -1,0 +1,8 @@
+{
+  "name": "Token Imbalances",
+  "build": {
+    "dockerfile": "../Dockerfile",
+    "context": ".."
+  },
+  "postCreateCommand": "python -m pip install -r requirements.txt"
+}
