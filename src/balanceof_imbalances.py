@@ -1,8 +1,8 @@
 from web3 import Web3
 from web3.types import TxReceipt, HexStr
 from eth_typing import ChecksumAddress
-from typing import Dict, Optional, Set, Any
-from src.config import ETHEREUM_NODE_URL
+from typing import Dict, Optional, Set
+from src.config import NODE_URL
 from src.constants import SETTLEMENT_CONTRACT_ADDRESS, NATIVE_ETH_TOKEN_ADDRESS
 from contracts.erc20_abi import erc20_abi
 
@@ -10,8 +10,8 @@ from contracts.erc20_abi import erc20_abi
 
 
 class BalanceOfImbalances:
-    def __init__(self, ETHEREUM_NODE_URL: str):
-        self.web3 = Web3(Web3.HTTPProvider(ETHEREUM_NODE_URL))
+    def __init__(self, NODE_URL: str):
+        self.web3 = Web3(Web3.HTTPProvider(NODE_URL))
 
     def get_token_balance(
         self,
@@ -124,7 +124,7 @@ class BalanceOfImbalances:
 
 def main():
     tx_hash = input("Enter transaction hash: ")
-    bo = BalanceOfImbalances(ETHEREUM_NODE_URL)
+    bo = BalanceOfImbalances(NODE_URL)
     imbalances = bo.compute_imbalances(tx_hash)
     print("Token Imbalances:")
     for token_address, imbalance in imbalances.items():

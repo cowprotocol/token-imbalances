@@ -1,18 +1,17 @@
 """
 Running this daemon computes raw imbalances for finalized blocks by calling imbalances_script.py.
 """
-
+import os
 import time
 from typing import List, Tuple
-from threading import Thread
 import pandas as pd
 from web3 import Web3
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
 from src.imbalances_script import RawTokenImbalances
 from src.config import (
-    CHAIN_RPC_ENDPOINTS,
-    CHAIN_SLEEP_TIMES,
+    CHAIN_SLEEP_TIME,
+    NODE_URL,
     create_backend_db_connection,
     create_solver_slippage_db_connection,
     check_db_connection,
@@ -20,11 +19,11 @@ from src.config import (
 )
 
 
-def get_web3_instance(chain_name: str) -> Web3:
+def get_web3_instance() -> Web3:
     """
     returns a Web3 instance for the given blockchain via chain name.
     """
-    return Web3(Web3.HTTPProvider(CHAIN_RPC_ENDPOINTS[chain_name]))
+    return Web3(Web3.HTTPProvider(NODE_URL))
 
 
 def get_finalized_block_number(web3: Web3) -> int:
@@ -191,9 +190,8 @@ def process_transactions(chain_name: str) -> None:
     """
     Process transactions to compute imbalances for a given blockchain via chain name.
     """
-    web3 = get_web3_instance(chain_name)
+    web3 = get_web3_instance()
     rt = RawTokenImbalances(web3, chain_name)
-    sleep_time = CHAIN_SLEEP_TIMES.get(chain_name)
     backend_db_connection = create_backend_db_connection(chain_name)
     solver_slippage_db_connection = create_solver_slippage_db_connection()
     start_block = get_start_block(chain_name, solver_slippage_db_connection, web3)
@@ -244,23 +242,19 @@ def process_transactions(chain_name: str) -> None:
             )
         except Exception as e:
             logger.error("Error processing transactions on %s: %s", chain_name, e)
-        if sleep_time is not None:
-            time.sleep(sleep_time)
+        if CHAIN_SLEEP_TIME is not None:
+            time.sleep(CHAIN_SLEEP_TIME)
 
 
 def main() -> None:
     """
-    Main function to start the daemon threads for each blockchain.
+    Main function to start the daemon for a blockchain.
     """
-    threads = []
-
-    for chain_name in CHAIN_RPC_ENDPOINTS.keys():
-        thread = Thread(target=process_transactions, args=(chain_name,), daemon=True)
-        thread.start()
-        threads.append(thread)
-
-    for thread in threads:
-        thread.join()
+    chain_name = os.getenv("CHAIN_NAME")
+    if chain_name is None:
+        logger.error("CHAIN_NAME environment variable is not set.")
+        return
+    process_transactions(chain_name)
 
 
 if __name__ == "__main__":

@@ -8,12 +8,15 @@ from src.helper_functions import get_logger
 
 
 load_dotenv()
-ETHEREUM_NODE_URL = os.getenv("ETHEREUM_NODE_URL")
-GNOSIS_NODE_URL = os.getenv("GNOSIS_NODE_URL")
-
-CHAIN_RPC_ENDPOINTS = {"Ethereum": ETHEREUM_NODE_URL, "Gnosis": GNOSIS_NODE_URL}
+NODE_URL = os.getenv("NODE_URL")
 
 logger = get_logger("raw_token_imbalances")
+
+# Utilized by imbalances_script for computing for single tx hash
+CHAIN_RPC_ENDPOINTS = {
+    "Ethereum": os.getenv("ETHEREUM_NODE_URL"),
+    "Gnosis": os.getenv("GNOSIS_NODE_URL"),
+}
 
 
 def get_env_int(var_name: str) -> int:
@@ -30,18 +33,12 @@ def get_env_int(var_name: str) -> int:
         raise ValueError(f"Environment variable {var_name} must be a int.")
 
 
-CHAIN_SLEEP_TIMES = {
-    "Ethereum": get_env_int("ETHEREUM_SLEEP_TIME"),
-    "Gnosis": get_env_int("GNOSIS_SLEEP_TIME"),
-}
+CHAIN_SLEEP_TIME = get_env_int("CHAIN_SLEEP_TIME")
 
 
 def create_backend_db_connection(chain_name: str) -> Engine:
     """function that creates a connection to the CoW db."""
-    if chain_name == "Ethereum":
-        read_db_url = os.getenv("ETHEREUM_DB_URL")
-    elif chain_name == "Gnosis":
-        read_db_url = os.getenv("GNOSIS_DB_URL")
+    read_db_url = os.getenv("DB_URL")
 
     if not read_db_url:
         raise ValueError(f"No database URL found for chain: {chain_name}")
