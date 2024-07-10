@@ -3,11 +3,11 @@ Running this daemon computes raw imbalances for finalized blocks by calling imba
 """
 
 import time
-from typing import List, Tuple, Any
+from typing import List, Tuple
 from threading import Thread
-import psycopg2
 import pandas as pd
 from web3 import Web3
+from sqlalchemy import text
 from sqlalchemy.engine import Engine
 from src.imbalances_script import RawTokenImbalances
 from src.config import (
@@ -58,37 +58,35 @@ def fetch_tx_data(
 
 
 def record_exists(
-    solver_slippage_db_connection: Any,
+    solver_slippage_db_engine: Engine,
     tx_hash_bytes: bytes,
     token_address_bytes: bytes,
 ) -> bool:
     """
     Check if a record with the given (tx_hash, token_address) already exists in the database.
     """
-    solver_slippage_db_connection = check_db_connection(solver_slippage_db_connection)
-    try:
-        cursor = solver_slippage_db_connection.cursor()
-        # check if the record exists
-        check_sql = """
-            SELECT 1 FROM raw_token_imbalances
-            WHERE tx_hash = %s AND token_address = %s
+    solver_slippage_db_engine = check_db_connection(solver_slippage_db_engine)
+    query = text(
         """
-        cursor.execute(
-            check_sql,
-            (psycopg2.Binary(tx_hash_bytes), psycopg2.Binary(token_address_bytes)),
-        )
-        record_exists = cursor.fetchone()
-        return record_exists is not None
-    except psycopg2.Error as e:
+        SELECT 1 FROM raw_token_imbalances
+        WHERE tx_hash = :tx_hash AND token_address = :token_address
+    """
+    )
+    try:
+        with solver_slippage_db_engine.connect() as connection:
+            result = connection.execute(
+                query, {"tx_hash": tx_hash_bytes, "token_address": token_address_bytes}
+            )
+            record_exists = result.fetchone() is not None
+            return record_exists
+    except Exception as e:
         logger.error("Error checking record existence: %s", e)
         return False
-    finally:
-        cursor.close()
 
 
 def write_token_imbalances_to_db(
     chain_name: str,
-    solver_slippage_db_connection: Any,
+    solver_slippage_db_engine: Engine,
     auction_id: int,
     block_number: int,
     tx_hash: str,
@@ -98,35 +96,33 @@ def write_token_imbalances_to_db(
     """
     Write token imbalances to the database if the (tx_hash, token_address) combination does not already exist.
     """
-    solver_slippage_db_connection = check_db_connection(solver_slippage_db_connection)
+    solver_slippage_db_engine = check_db_connection(solver_slippage_db_engine)
     tx_hash_bytes = bytes.fromhex(tx_hash[2:])
     token_address_bytes = bytes.fromhex(token_address[2:])
-    if not record_exists(
-        solver_slippage_db_connection, tx_hash_bytes, token_address_bytes
-    ):
-        try:
-            cursor = solver_slippage_db_connection.cursor()
-            insert_sql = """
-                INSERT INTO raw_token_imbalances (auction_id, chain_name, block_number, tx_hash, token_address, imbalance)
-                VALUES (%s, %s, %s, %s, %s, %s)
+    if not record_exists(solver_slippage_db_engine, tx_hash_bytes, token_address_bytes):
+        insert_sql = text(
             """
-            cursor.execute(
-                insert_sql,
-                (
-                    auction_id,
-                    chain_name,
-                    block_number,
-                    psycopg2.Binary(tx_hash_bytes),
-                    psycopg2.Binary(token_address_bytes),
-                    imbalance,
-                ),
-            )
-            solver_slippage_db_connection.commit()
-            logger.debug("Record inserted successfully.")
-        except psycopg2.Error as e:
+            INSERT INTO raw_token_imbalances (auction_id, chain_name, block_number, tx_hash, token_address, imbalance)
+            VALUES (:auction_id, :chain_name, :block_number, :tx_hash, :token_address, :imbalance)
+        """
+        )
+        try:
+            with solver_slippage_db_engine.connect() as connection:
+                connection.execute(
+                    insert_sql,
+                    {
+                        "auction_id": auction_id,
+                        "chain_name": chain_name,
+                        "block_number": block_number,
+                        "tx_hash": tx_hash_bytes,
+                        "token_address": token_address_bytes,
+                        "imbalance": imbalance,
+                    },
+                )
+                connection.commit()
+                logger.debug("Record inserted successfully.")
+        except Exception as e:
             logger.error("Error inserting record: %s", e)
-        finally:
-            cursor.close()
     else:
         logger.info(
             "Record with tx_hash %s and token_address %s already exists.",
@@ -136,7 +132,7 @@ def write_token_imbalances_to_db(
 
 
 def get_start_block(
-    chain_name: str, solver_slippage_db_connection: Any, web3: Web3
+    chain_name: str, solver_slippage_db_engine: Engine, web3: Web3
 ) -> int:
     """
     Retrieve the most recent block already present in raw_token_imbalances table,
@@ -144,46 +140,51 @@ def get_start_block(
     If no entries are present, fallback to get_finalized_block_number().
     """
     try:
-        solver_slippage_db_connection = check_db_connection(
-            solver_slippage_db_connection
+        solver_slippage_db_engine = check_db_connection(solver_slippage_db_engine)
+
+        query_max_block = text(
+            """
+            SELECT MAX(block_number) FROM raw_token_imbalances
+            WHERE chain_name = :chain_name
+        """
         )
 
-        # query to get the maximum block number present in the table for the given chain_name
-        query_max_block = """
-            SELECT MAX(block_number) FROM raw_token_imbalances
-            WHERE chain_name = %s
-        """
+        with solver_slippage_db_engine.connect() as connection:
+            result = connection.execute(query_max_block, {"chain_name": chain_name})
+            row = result.fetchone()
+            max_block = (
+                row[0] if row is not None else None
+            )  # Fetch the maximum block number
+            if max_block is not None:
+                logger.debug("Fetched max block number from database: %d", max_block)
 
-        cursor = solver_slippage_db_connection.cursor()
-        cursor.execute(query_max_block, (chain_name,))
-        max_block = cursor.fetchone()[0]  # Fetch the maximum block number
-        if max_block is not None:
-            logger.debug(f"Fetched max block number from database: {max_block}")
-        # If no entries present, fallback to get_finalized_block_number()
-        if max_block is None:
-            cursor.close()
-            return get_finalized_block_number(web3)
+            # If no entries present, fallback to get_finalized_block_number()
+            if max_block is None:
+                return get_finalized_block_number(web3)
 
-        # delete entries for the max block from the table
-        delete_sql = """
-            DELETE FROM raw_token_imbalances WHERE chain_name = %s AND block_number = %s
-        """
-        try:
-            cursor.execute(delete_sql, (chain_name, max_block))
-            solver_slippage_db_connection.commit()
-            logger.debug(f"Successfully deleted entries for block number: {max_block}")
-        except Exception as e:
-            logger.debug(f"Failed to delete entries for block number {max_block}: {e}")
+            # delete entries for the max block from the table
+            delete_sql = text(
+                """
+                DELETE FROM raw_token_imbalances WHERE chain_name = :chain_name AND block_number = :block_number
+            """
+            )
+            try:
+                connection.execute(
+                    delete_sql, {"chain_name": chain_name, "block_number": max_block}
+                )
+                connection.commit()
+                logger.debug(
+                    "Successfully deleted entries for block number: %s", max_block
+                )
+            except Exception as e:
+                logger.debug(
+                    "Failed to delete entries for block number %s: %s", max_block, e
+                )
 
-        cursor.close()
-        return max_block
-
-    except psycopg2.Error as e:
+            return max_block
+    except Exception as e:
         logger.error("Error accessing database: %s", e)
-        # Fallback to get_finalized_block_number() in case of any error
         return get_finalized_block_number(web3)
-    finally:
-        solver_slippage_db_connection.close()  # Close the database connection
 
 
 def process_transactions(chain_name: str) -> None:

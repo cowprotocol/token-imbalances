@@ -1,10 +1,9 @@
 import os
-import psycopg2
-from typing import Any, Optional
+from typing import Optional
+from sqlalchemy import text
+from sqlalchemy.exc import OperationalError
 from sqlalchemy import create_engine, Engine
 from dotenv import load_dotenv
-from urllib.parse import urlparse
-from psycopg2.extensions import connection as Psycopg2Connection
 from src.helper_functions import get_logger
 
 
@@ -50,33 +49,27 @@ def create_backend_db_connection(chain_name: str) -> Engine:
     return create_engine(f"postgresql+psycopg2://{read_db_url}")
 
 
-def create_solver_slippage_db_connection() -> Psycopg2Connection:
-    """Function that creates a connection to the write database."""
+def create_solver_slippage_db_connection() -> Engine:
+    """function that creates a connection to the CoW db."""
+    solver_db_url = os.getenv("SOLVER_SLIPPAGE_DB_URL")
+    if not solver_db_url:
+        raise ValueError(
+            "Solver slippage database URL not found in environment variables."
+        )
 
-    parsed_url = urlparse(os.getenv("SOLVER_SLIPPAGE_DB_URL"))
-
-    if not parsed_url.hostname or not parsed_url.path:
-        raise ValueError("Invalid or missing write database URL")
-
-    # Connect to the database
-    solver_slippage_connection = psycopg2.connect(
-        database=parsed_url.path[1:],
-        user=parsed_url.username,
-        password=parsed_url.password,
-        host=parsed_url.hostname,
-        port=parsed_url.port,
-    )
-    return solver_slippage_connection
+    return create_engine(f"postgresql+psycopg2://{solver_db_url}")
 
 
-def check_db_connection(connection: Any, chain_name: Optional[str] = None) -> Any:
+def check_db_connection(connection: Engine, chain_name: Optional[str] = None) -> Engine:
     """
     Check if the database connection is still active. If not, create a new one.
     """
     try:
-        if connection.closed:
-            raise psycopg2.OperationalError("Connection is closed")
-    except (psycopg2.OperationalError, AttributeError):
+        if connection:
+            with connection.connect() as conn:  # Use connection.connect() to get a Connection object
+                conn.execute(text("SELECT 1"))
+    except OperationalError:
+        # if connection is closed, create new one
         connection = (
             create_backend_db_connection(chain_name)
             if chain_name
