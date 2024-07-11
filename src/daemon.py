@@ -12,8 +12,7 @@ from src.imbalances_script import RawTokenImbalances
 from src.config import (
     CHAIN_SLEEP_TIME,
     NODE_URL,
-    create_backend_db_connection,
-    create_solver_slippage_db_connection,
+    create_db_connection,
     check_db_connection,
     logger,
 )
@@ -34,10 +33,12 @@ def get_finalized_block_number(web3: Web3) -> int:
 
 
 def fetch_tx_data(
-    backend_db_connection: Engine, chain_name: str, start_block: int, end_block: int
+    backend_db_connection: Engine, start_block: int, end_block: int
 ) -> List[Tuple[str, int, int]]:
     """Fetch transaction hashes beginning from start_block to end_block."""
-    backend_db_connection = check_db_connection(backend_db_connection, chain_name)
+
+    backend_db_connection = check_db_connection(backend_db_connection, "backend")
+
     query = f"""
     SELECT tx_hash, auction_id, block_number
     FROM settlements
@@ -57,14 +58,17 @@ def fetch_tx_data(
 
 
 def record_exists(
-    solver_slippage_db_engine: Engine,
+    solver_slippage_connection: Engine,
     tx_hash_bytes: bytes,
     token_address_bytes: bytes,
 ) -> bool:
     """
     Check if a record with the given (tx_hash, token_address) already exists in the database.
     """
-    solver_slippage_db_engine = check_db_connection(solver_slippage_db_engine)
+    solver_slippage_connection = check_db_connection(
+        solver_slippage_connection, "solver_slippage"
+    )
+
     query = text(
         """
         SELECT 1 FROM raw_token_imbalances
@@ -72,7 +76,7 @@ def record_exists(
     """
     )
     try:
-        with solver_slippage_db_engine.connect() as connection:
+        with solver_slippage_connection.connect() as connection:
             result = connection.execute(
                 query, {"tx_hash": tx_hash_bytes, "token_address": token_address_bytes}
             )
@@ -85,7 +89,7 @@ def record_exists(
 
 def write_token_imbalances_to_db(
     chain_name: str,
-    solver_slippage_db_engine: Engine,
+    solver_slippage_connection: Engine,
     auction_id: int,
     block_number: int,
     tx_hash: str,
@@ -95,10 +99,15 @@ def write_token_imbalances_to_db(
     """
     Write token imbalances to the database if the (tx_hash, token_address) combination does not already exist.
     """
-    solver_slippage_db_engine = check_db_connection(solver_slippage_db_engine)
+    solver_slippage_connection = check_db_connection(
+        solver_slippage_connection, "solver_slippage"
+    )
+
     tx_hash_bytes = bytes.fromhex(tx_hash[2:])
     token_address_bytes = bytes.fromhex(token_address[2:])
-    if not record_exists(solver_slippage_db_engine, tx_hash_bytes, token_address_bytes):
+    if not record_exists(
+        solver_slippage_connection, tx_hash_bytes, token_address_bytes
+    ):
         insert_sql = text(
             """
             INSERT INTO raw_token_imbalances (auction_id, chain_name, block_number, tx_hash, token_address, imbalance)
@@ -106,7 +115,7 @@ def write_token_imbalances_to_db(
         """
         )
         try:
-            with solver_slippage_db_engine.connect() as connection:
+            with solver_slippage_connection.connect() as connection:
                 connection.execute(
                     insert_sql,
                     {
@@ -131,7 +140,7 @@ def write_token_imbalances_to_db(
 
 
 def get_start_block(
-    chain_name: str, solver_slippage_db_engine: Engine, web3: Web3
+    chain_name: str, solver_slippage_connection: Engine, web3: Web3
 ) -> int:
     """
     Retrieve the most recent block already present in raw_token_imbalances table,
@@ -139,7 +148,9 @@ def get_start_block(
     If no entries are present, fallback to get_finalized_block_number().
     """
     try:
-        solver_slippage_db_engine = check_db_connection(solver_slippage_db_engine)
+        solver_slippage_connection = check_db_connection(
+            solver_slippage_connection, "solver_slippage"
+        )
 
         query_max_block = text(
             """
@@ -148,7 +159,7 @@ def get_start_block(
         """
         )
 
-        with solver_slippage_db_engine.connect() as connection:
+        with solver_slippage_connection.connect() as connection:
             result = connection.execute(query_max_block, {"chain_name": chain_name})
             row = result.fetchone()
             max_block = (
@@ -176,7 +187,7 @@ def get_start_block(
                     "Successfully deleted entries for block number: %s", max_block
                 )
             except Exception as e:
-                logger.debug(
+                logger.error(
                     "Failed to delete entries for block number %s: %s", max_block, e
                 )
 
@@ -192,8 +203,8 @@ def process_transactions(chain_name: str) -> None:
     """
     web3 = get_web3_instance()
     rt = RawTokenImbalances(web3, chain_name)
-    backend_db_connection = create_backend_db_connection(chain_name)
-    solver_slippage_db_connection = create_solver_slippage_db_connection()
+    backend_db_connection = create_db_connection("backend")
+    solver_slippage_db_connection = create_db_connection("solver_slippage")
     start_block = get_start_block(chain_name, solver_slippage_db_connection, web3)
     previous_block = start_block
     unprocessed_txs: List[Tuple[str, int, int]] = []
@@ -202,10 +213,8 @@ def process_transactions(chain_name: str) -> None:
     while True:
         try:
             latest_block = get_finalized_block_number(web3)
-            new_txs = fetch_tx_data(
-                backend_db_connection, chain_name, previous_block, latest_block
-            )
-            # add any unprocessed txs for processing, then clear list of unprocessed
+            new_txs = fetch_tx_data(backend_db_connection, previous_block, latest_block)
+            # Add any unprocessed txs for processing, then clear list of unprocessed
             all_txs = new_txs + unprocessed_txs
             unprocessed_txs.clear()
 
@@ -213,28 +222,30 @@ def process_transactions(chain_name: str) -> None:
                 logger.info("Processing transaction on %s: %s", chain_name, tx)
                 try:
                     imbalances = rt.compute_imbalances(tx)
-                    # append imbalances to a single log message
-                    log_message = [f"Token Imbalances on {chain_name} for tx {tx}:"]
-                    for token_address, imbalance in imbalances.items():
-                        # ignore tokens that have null imbalances
-                        if imbalance != 0:
-                            write_token_imbalances_to_db(
-                                chain_name,
-                                solver_slippage_db_connection,
-                                auction_id,
-                                block_number,
-                                tx,
-                                token_address,
-                                imbalance,
-                            )
-                            log_message.append(
-                                f"Token: {token_address}, Imbalance: {imbalance}"
-                            )
-                    logger.info("\n".join(log_message))
+                    # Append imbalances to a single log message
+                    if imbalances is not None:
+                        log_message = [f"Token Imbalances on {chain_name} for tx {tx}:"]
+                        for token_address, imbalance in imbalances.items():
+                            # Ignore tokens that have null imbalances
+                            if imbalance != 0:
+                                write_token_imbalances_to_db(
+                                    chain_name,
+                                    solver_slippage_db_connection,
+                                    auction_id,
+                                    block_number,
+                                    tx,
+                                    token_address,
+                                    imbalance,
+                                )
+                                log_message.append(
+                                    f"Token: {token_address}, Imbalance: {imbalance}"
+                                )
+                        logger.info("\n".join(log_message))
+                    else:
+                        raise ValueError("Imbalances computation returned None.")
                 except ValueError as e:
                     logger.error("ValueError: %s", e)
                     unprocessed_txs.append((tx, auction_id, block_number))
-
             previous_block = latest_block + 1
         except ConnectionError as e:
             logger.error(
@@ -242,6 +253,7 @@ def process_transactions(chain_name: str) -> None:
             )
         except Exception as e:
             logger.error("Error processing transactions on %s: %s", chain_name, e)
+
         if CHAIN_SLEEP_TIME is not None:
             time.sleep(CHAIN_SLEEP_TIME)
 
