@@ -1,8 +1,31 @@
+// For format details, see https://aka.ms/devcontainer.json. For config options, see the
+// README at: https://github.com/devcontainers/templates/tree/main/src/docker-existing-dockerfile
 {
-  "name": "Token Imbalances",
-  "build": {
-    "dockerfile": "../Dockerfile",
-    "context": ".."
-  },
-  "postCreateCommand": "python -m pip install -r requirements.txt"
+	"name": "Token Imbalances",
+	"build": {
+	  "dockerfile": "../Dockerfile",
+	  "context": ".."
+	},
+	"postCreateCommand": "python -m pip install -r requirements.txt",
+
+	"mounts": [
+		"source=${localEnv:HOME}/.ssh,target=/root/.ssh,type=bind,consistency=cached"
+	],
+
+	"customizations": {
+        "vscode": {
+            "extensions": [
+                "ms-python.python",
+                "ms-python.mypy-type-checker"
+            ],
+            "settings": {
+                "python.testing.pytestArgs": [
+                    "."
+                ],
+                "python.testing.unittestEnabled": false,
+                "python.testing.pytestEnabled": true,
+                "python.formatting.provider": "black",
+            }
+        }
+    }
 }
