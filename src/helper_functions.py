@@ -92,8 +92,10 @@ def get_auction_id(web3: Web3, tx_hash: str) -> int:
     """
     transaction = web3.eth.get_transaction(HexBytes(tx_hash))
     call_data = transaction["input"]
-    call_data_bytes = bytes.fromhex(call_data[2:])  # convert hex string to bytes
-    auction_id = int.from_bytes(
-        call_data_bytes[-8:], byteorder="big"
-    )  # specify byteorder
+    # Ensure call_data is converted to a hex string if it is HexBytes
+    call_data_bytes = bytes.fromhex(
+        call_data.hex()[2:] if isinstance(call_data, HexBytes) else call_data[2:]
+    )
+    # Specify byteorder to convert bytes to int
+    auction_id = int.from_bytes(call_data_bytes[-8:], byteorder="big")
     return auction_id
