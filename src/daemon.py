@@ -16,6 +16,10 @@ from src.config import (
     check_db_connection,
     logger,
 )
+from src.fee_calculations.web3_api import Blockchain
+from src.fee_calculations.database_api import Database
+from src.fee_calculations.main_file import compute_all_fees
+from hexbytes import HexBytes
 
 
 def get_web3_instance() -> Web3:
@@ -138,6 +142,63 @@ def write_token_imbalances_to_db(
             token_address,
         )
 
+def write_fees_to_db(
+    chain_name: str,
+    solver_slippage_connection: Engine,
+    auction_id: int,
+    block_number: int,
+    tx_hash: str,
+    order_uid: str,
+    token_address: str,
+    fee: float,
+    kind: str,
+) -> None:
+    """
+    Write token imbalances to the database if the (tx_hash, token_address) combination does not already exist.
+    """
+    solver_slippage_connection = check_db_connection(
+        solver_slippage_connection, "solver_slippage"
+    )
+
+    tx_hash_bytes = bytes.fromhex(tx_hash[2:])
+    token_address_bytes = bytes.fromhex(token_address[2:])
+    order_uid_bytes = bytes.fromhex(order_uid[2:])
+    if not record_exists(
+        solver_slippage_connection, tx_hash_bytes, token_address_bytes
+    ):
+        insert_sql = text(
+            """
+            INSERT INTO raw_fees (auction_id, chain_name, block_number, tx_hash, order_uid, token_address, fee_amount, kind)
+            VALUES (:auction_id, :chain_name, :block_number, :tx_hash, :order_uid, :token_address, :fee_amount, :kind)
+        """
+        )
+        try:
+            with solver_slippage_connection.connect() as connection:
+                connection.execute(
+                    insert_sql,
+                    {
+                        "auction_id": auction_id,
+                        "chain_name": chain_name,
+                        "block_number": block_number,
+                        "tx_hash": tx_hash_bytes,
+                        "order_uid": order_uid_bytes,
+                        "token_address": token_address_bytes,
+                        "fee_amount": fee,
+                        "kind": kind
+                    },
+                )
+                connection.commit()
+                logger.debug("Record inserted successfully.")
+        except Exception as e:
+            logger.error("Error inserting record: %s", e)
+    else:
+        logger.info(
+            "Record with tx_hash %s and token_address %s already exists.",
+            tx_hash,
+            token_address,
+        )
+
+
 
 def get_start_block(
     chain_name: str, solver_slippage_connection: Engine, web3: Web3
@@ -210,6 +271,8 @@ def process_transactions(chain_name: str) -> None:
     unprocessed_txs: List[Tuple[str, int, int]] = []
 
     logger.info("%s Daemon started. Start block: %d", chain_name, start_block)
+    onchain_fetcher = Blockchain()
+    offchain_fetcher = Database()
     while True:
         try:
             latest_block = get_finalized_block_number(web3)
@@ -222,24 +285,41 @@ def process_transactions(chain_name: str) -> None:
                 logger.info("Processing transaction on %s: %s", chain_name, tx)
                 try:
                     imbalances = rt.compute_imbalances(tx)
+                    fees = compute_all_fees(HexBytes(tx), onchain_fetcher, offchain_fetcher)
+                    print()
+                    print("Printing all fees")
+                    print()
+                    for fee in fees:
+                        write_fees_to_db(
+                            chain_name,
+                            solver_slippage_db_connection,
+                            auction_id,
+                            block_number,
+                            tx,
+                            order_uid=fee[2].hex(),
+                            token_address=fee[3].hex(),
+                            fee=fee[4],
+                            kind=fee[5]
+                        )
+                        
                     # Append imbalances to a single log message
                     if imbalances is not None:
                         log_message = [f"Token Imbalances on {chain_name} for tx {tx}:"]
                         for token_address, imbalance in imbalances.items():
                             # Ignore tokens that have null imbalances
-                            if imbalance != 0:
-                                write_token_imbalances_to_db(
-                                    chain_name,
-                                    solver_slippage_db_connection,
-                                    auction_id,
-                                    block_number,
-                                    tx,
-                                    token_address,
-                                    imbalance,
-                                )
-                                log_message.append(
-                                    f"Token: {token_address}, Imbalance: {imbalance}"
-                                )
+                            # if imbalance != 0:
+                            #     write_token_imbalances_to_db(
+                            #         chain_name,
+                            #         solver_slippage_db_connection,
+                            #         auction_id,
+                            #         block_number,
+                            #         tx,
+                            #         token_address,
+                            #         imbalance,
+                            #     )
+                            log_message.append(
+                                f"Token: {token_address}, Imbalance: {imbalance}"
+                            )
                         logger.info("\n".join(log_message))
                     else:
                         raise ValueError("Imbalances computation returned None.")
