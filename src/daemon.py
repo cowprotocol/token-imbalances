@@ -286,9 +286,6 @@ def process_transactions(chain_name: str) -> None:
                 try:
                     imbalances = rt.compute_imbalances(tx)
                     fees = compute_all_fees(HexBytes(tx), onchain_fetcher, offchain_fetcher)
-                    print()
-                    print("Printing all fees")
-                    print()
                     for fee in fees:
                         write_fees_to_db(
                             chain_name,
