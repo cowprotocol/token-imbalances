@@ -20,7 +20,7 @@ from src.config import (
     check_db_connection,
     logger,
 )
-
+from src.coingecko_pricing import get_price
 
 def get_start_block(
     chain_name: str, solver_slippage_connection: Engine, web3: Web3
@@ -218,9 +218,13 @@ def process_transactions(chain_name: str) -> None:
                                     token_address,
                                     imbalance,
                                 )
+                                # log_message.append(
+                                #     f"Token: {token_address}, Imbalance: {imbalance}"
+                                # )
                                 log_message.append(
-                                    f"Token: {token_address}, Imbalance: {imbalance}"
+                                    f"Token: {token_address}, Imbalance: {imbalance}, ETH value: {get_price(block_number, token_address, imbalance)}"
                                 )
+                                # logger.info(f"Token: {token_address}, Imbalance: {imbalance}, ETH value: {get_price(block_number, token_address, imbalance)}")
                         logger.info("\n".join(log_message))
                     else:
                         raise ValueError("Imbalances computation returned None.")
