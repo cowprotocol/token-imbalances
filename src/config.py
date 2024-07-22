@@ -9,11 +9,11 @@ from src.helper_functions import get_logger
 load_dotenv()
 NODE_URL = os.getenv("NODE_URL")
 
-logger = get_logger("raw_token_imbalances")
+logger = get_logger("raw_token_imbalances_temp")
 
 # Utilized by imbalances_script for computing for single tx hash
 CHAIN_RPC_ENDPOINTS = {
-    "Ethereum": os.getenv("ETHEREUM_NODE_URL"),
+    "Ethereum": os.getenv("NODE_URL"),
     "Gnosis": os.getenv("GNOSIS_NODE_URL"),
 }
 
@@ -43,7 +43,7 @@ CHAIN_SLEEP_TIME = get_env_int("CHAIN_SLEEP_TIME")
 def create_db_connection(db_type: str) -> Engine:
     """
     Function that creates a connection to the specified database.
-    db_type should be either "backend" or "solver_slippage".
+    expected db_type should be "solver_slippage".
     """
     db_url = CREATE_DB_URLS.get(db_type)
     if not db_url:

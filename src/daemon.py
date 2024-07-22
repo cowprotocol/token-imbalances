@@ -4,14 +4,18 @@ Running this daemon computes raw imbalances for finalized blocks by calling imba
 import os
 import time
 from typing import List, Tuple
-import pandas as pd
 from web3 import Web3
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
 from src.imbalances_script import RawTokenImbalances
+from src.helper_functions import (
+    get_web3_instance,
+    get_finalized_block_number,
+    get_tx_hashes_blocks,
+    get_auction_id,
+)
 from src.config import (
     CHAIN_SLEEP_TIME,
-    NODE_URL,
     create_db_connection,
     check_db_connection,
     logger,
@@ -21,43 +25,80 @@ from src.fee_calculations.database_api import Database
 from src.fee_calculations.main_file import compute_all_fees
 from hexbytes import HexBytes
 
+from src.coingecko_pricing import get_price
 
-def get_web3_instance() -> Web3:
+def get_start_block(
+    chain_name: str, solver_slippage_connection: Engine, web3: Web3
+) -> int:
     """
-    returns a Web3 instance for the given blockchain via chain name.
+    Retrieve the most recent block already present in raw_token_imbalances table,
+    delete entries for that block, and return this block number as start_block.
+    If no entries are present, fallback to get_finalized_block_number().
     """
-    return Web3(Web3.HTTPProvider(NODE_URL))
+    try:
+        solver_slippage_connection = check_db_connection(
+            solver_slippage_connection, "solver_slippage"
+        )
 
+        query_max_block = text(
+            """
+            SELECT MAX(block_number) FROM raw_token_imbalances_temp
+            WHERE chain_name = :chain_name
+        """
+        )
 
-def get_finalized_block_number(web3: Web3) -> int:
-    """
-    Get the number of the most recent finalized block.
-    """
-    return web3.eth.block_number - 67
+        with solver_slippage_connection.connect() as connection:
+            result = connection.execute(query_max_block, {"chain_name": chain_name})
+            row = result.fetchone()
+            max_block = (
+                row[0] if row is not None else None
+            )  # Fetch the maximum block number
+            if max_block is not None:
+                logger.debug("Fetched max block number from database: %d", max_block)
+
+            # If no entries present, fallback to get_finalized_block_number()
+            if max_block is None:
+                return get_finalized_block_number(web3)
+
+            # delete entries for the max block from the table
+            delete_sql = text(
+                """
+                DELETE FROM raw_token_imbalances_temp WHERE chain_name = :chain_name AND block_number = :block_number
+            """
+            )
+            try:
+                connection.execute(
+                    delete_sql, {"chain_name": chain_name, "block_number": max_block}
+                )
+                connection.commit()
+                logger.debug(
+                    "Successfully deleted entries for block number: %s", max_block
+                )
+            except Exception as e:
+                logger.error(
+                    "Failed to delete entries for block number %s: %s", max_block, e
+                )
+
+            return max_block
+    except Exception as e:
+        logger.error("Error accessing database: %s", e)
+        return get_finalized_block_number(web3)
 
 
 def fetch_tx_data(
-    backend_db_connection: Engine, start_block: int, end_block: int
+    start_block: int, end_block: int, web3: Web3
 ) -> List[Tuple[str, int, int]]:
     """Fetch transaction hashes beginning from start_block to end_block."""
+    tx_data: List[Tuple[str, int, int]] = []
+    tx_hashes_blocks = get_tx_hashes_blocks(start_block, end_block, web3)
 
-    backend_db_connection = check_db_connection(backend_db_connection, "backend")
+    for tx_hash, block_number in tx_hashes_blocks:
+        try:
+            auction_id = get_auction_id(web3, tx_hash)
+            tx_data.append((tx_hash, auction_id, block_number))
+        except Exception as e:
+            print(f"Error fetching auction ID for {tx_hash}: {e}")
 
-    query = f"""
-    SELECT tx_hash, auction_id, block_number
-    FROM settlements
-    WHERE block_number >= {start_block}
-    AND block_number <= {end_block}
-    """
-    db_data = pd.read_sql(query, backend_db_connection)
-    # converts hashes at memory location to hex
-    db_data["tx_hash"] = db_data["tx_hash"].apply(lambda x: f"0x{x.hex()}")
-
-    # return (tx hash, auction id) as tx_data
-    tx_data = [
-        (row["tx_hash"], row["auction_id"], row["block_number"])
-        for index, row in db_data.iterrows()
-    ]
     return tx_data
 
 
@@ -75,7 +116,7 @@ def record_exists(
 
     query = text(
         """
-        SELECT 1 FROM raw_token_imbalances
+        SELECT 1 FROM raw_token_imbalances_temp
         WHERE tx_hash = :tx_hash AND token_address = :token_address
     """
     )
@@ -114,7 +155,7 @@ def write_token_imbalances_to_db(
     ):
         insert_sql = text(
             """
-            INSERT INTO raw_token_imbalances (auction_id, chain_name, block_number, tx_hash, token_address, imbalance)
+            INSERT INTO raw_token_imbalances_temp (auction_id, chain_name, block_number, tx_hash, token_address, imbalance)
             VALUES (:auction_id, :chain_name, :block_number, :tx_hash, :token_address, :imbalance)
         """
         )
@@ -264,7 +305,6 @@ def process_transactions(chain_name: str) -> None:
     """
     web3 = get_web3_instance()
     rt = RawTokenImbalances(web3, chain_name)
-    backend_db_connection = create_db_connection("backend")
     solver_slippage_db_connection = create_db_connection("solver_slippage")
     start_block = get_start_block(chain_name, solver_slippage_db_connection, web3)
     previous_block = start_block
@@ -276,7 +316,7 @@ def process_transactions(chain_name: str) -> None:
     while True:
         try:
             latest_block = get_finalized_block_number(web3)
-            new_txs = fetch_tx_data(backend_db_connection, previous_block, latest_block)
+            new_txs = fetch_tx_data(previous_block, latest_block, web3)
             # Add any unprocessed txs for processing, then clear list of unprocessed
             all_txs = new_txs + unprocessed_txs
             unprocessed_txs.clear()
@@ -304,19 +344,23 @@ def process_transactions(chain_name: str) -> None:
                         log_message = [f"Token Imbalances on {chain_name} for tx {tx}:"]
                         for token_address, imbalance in imbalances.items():
                             # Ignore tokens that have null imbalances
-                            # if imbalance != 0:
-                            #     write_token_imbalances_to_db(
-                            #         chain_name,
-                            #         solver_slippage_db_connection,
-                            #         auction_id,
-                            #         block_number,
-                            #         tx,
-                            #         token_address,
-                            #         imbalance,
-                            #     )
-                            log_message.append(
-                                f"Token: {token_address}, Imbalance: {imbalance}"
-                            )
+                            if imbalance != 0:
+                                write_token_imbalances_to_db(
+                                    chain_name,
+                                    solver_slippage_db_connection,
+                                    auction_id,
+                                    block_number,
+                                    tx,
+                                    token_address,
+                                    imbalance,
+                                )
+                                # log_message.append(
+                                #     f"Token: {token_address}, Imbalance: {imbalance}"
+                                # )
+                                log_message.append(
+                                    f"Token: {token_address}, Imbalance: {imbalance}, ETH value: {get_price(block_number, token_address, imbalance)}"
+                                )
+                                # logger.info(f"Token: {token_address}, Imbalance: {imbalance}, ETH value: {get_price(block_number, token_address, imbalance)}")
                         logger.info("\n".join(log_message))
                     else:
                         raise ValueError("Imbalances computation returned None.")

@@ -216,7 +216,7 @@ class RawTokenImbalances:
         self, events: Dict[str, List[Dict]], address: str
     ) -> Dict[str, int]:
         """Calculate token imbalances from events."""
-        inflows, outflows = {}, {}  # type: (dict, dict)
+        inflows, outflows = {}, {} 
         for event in events["Transfer"]:
             self.process_event(event, inflows, outflows, address)
 
