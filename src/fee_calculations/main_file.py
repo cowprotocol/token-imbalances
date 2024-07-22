@@ -77,10 +77,14 @@ def compute_all_fees(
                             protocol_fee,
                         )
                     )
-                network_fee = trade.sell_amount - max(trade_raw_surplus - trade_onchain_surplus, 0) - (
-                    raw_buy_amount
-                    * clearing_prices[trade.buy_token]
-                    // clearing_prices[trade.sell_token]
+                network_fee = (
+                    trade.sell_amount
+                    - max(trade_raw_surplus - trade_onchain_surplus, 0)
+                    - (
+                        raw_buy_amount
+                        * clearing_prices[trade.buy_token]
+                        // clearing_prices[trade.sell_token]
+                    )
                 )
                 res.append(
                     (

@@ -136,7 +136,7 @@ class Database:
             valid_orders,
             jit_order_addresses,
             native_prices,
-            clearing_prices
+            clearing_prices,
         )
 
     def get_competition_data(self, auction_id: int, solver: HexBytes) -> Row[Any]:

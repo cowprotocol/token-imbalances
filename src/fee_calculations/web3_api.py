@@ -15,12 +15,15 @@ from web3.types import TxData, TxParams, TxReceipt, EventData
 
 from src.fee_calculations.constants import (
     SETTLEMENT_CONTRACT_ADDRESS,
-
 )
 from src.fee_calculations.contracts.gpv2settlement import gpv2_settlement
 from src.fee_calculations.contracts.gpv2_authenticator import gpv2_authenticator
 from src.fee_calculations.contracts.zodiac_module import zodiac_module
-from src.fee_calculations.exceptions import MissingOnchainData, InvalidSettlement, WhitelistedSolver
+from src.fee_calculations.exceptions import (
+    MissingOnchainData,
+    InvalidSettlement,
+    WhitelistedSolver,
+)
 from src.fee_calculations.logger import logger
 from src.fee_calculations.models import OnchainTrade, OnchainSettlementData
 

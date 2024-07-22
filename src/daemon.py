@@ -27,6 +27,7 @@ from hexbytes import HexBytes
 
 from src.coingecko_pricing import get_price
 
+
 def get_start_block(
     chain_name: str, solver_slippage_connection: Engine, web3: Web3
 ) -> int:
@@ -183,6 +184,7 @@ def write_token_imbalances_to_db(
             token_address,
         )
 
+
 def write_fees_to_db(
     chain_name: str,
     solver_slippage_connection: Engine,
@@ -225,7 +227,7 @@ def write_fees_to_db(
                         "order_uid": order_uid_bytes,
                         "token_address": token_address_bytes,
                         "fee_amount": fee,
-                        "kind": kind
+                        "kind": kind,
                     },
                 )
                 connection.commit()
@@ -238,65 +240,6 @@ def write_fees_to_db(
             tx_hash,
             token_address,
         )
-
-
-
-def get_start_block(
-    chain_name: str, solver_slippage_connection: Engine, web3: Web3
-) -> int:
-    """
-    Retrieve the most recent block already present in raw_token_imbalances table,
-    delete entries for that block, and return this block number as start_block.
-    If no entries are present, fallback to get_finalized_block_number().
-    """
-    try:
-        solver_slippage_connection = check_db_connection(
-            solver_slippage_connection, "solver_slippage"
-        )
-
-        query_max_block = text(
-            """
-            SELECT MAX(block_number) FROM raw_token_imbalances
-            WHERE chain_name = :chain_name
-        """
-        )
-
-        with solver_slippage_connection.connect() as connection:
-            result = connection.execute(query_max_block, {"chain_name": chain_name})
-            row = result.fetchone()
-            max_block = (
-                row[0] if row is not None else None
-            )  # Fetch the maximum block number
-            if max_block is not None:
-                logger.debug("Fetched max block number from database: %d", max_block)
-
-            # If no entries present, fallback to get_finalized_block_number()
-            if max_block is None:
-                return get_finalized_block_number(web3)
-
-            # delete entries for the max block from the table
-            delete_sql = text(
-                """
-                DELETE FROM raw_token_imbalances WHERE chain_name = :chain_name AND block_number = :block_number
-            """
-            )
-            try:
-                connection.execute(
-                    delete_sql, {"chain_name": chain_name, "block_number": max_block}
-                )
-                connection.commit()
-                logger.debug(
-                    "Successfully deleted entries for block number: %s", max_block
-                )
-            except Exception as e:
-                logger.error(
-                    "Failed to delete entries for block number %s: %s", max_block, e
-                )
-
-            return max_block
-    except Exception as e:
-        logger.error("Error accessing database: %s", e)
-        return get_finalized_block_number(web3)
 
 
 def process_transactions(chain_name: str) -> None:
@@ -325,20 +268,22 @@ def process_transactions(chain_name: str) -> None:
                 logger.info("Processing transaction on %s: %s", chain_name, tx)
                 try:
                     imbalances = rt.compute_imbalances(tx)
-                    fees = compute_all_fees(HexBytes(tx), onchain_fetcher, offchain_fetcher)
-                    for fee in fees:
-                        write_fees_to_db(
-                            chain_name,
-                            solver_slippage_db_connection,
-                            auction_id,
-                            block_number,
-                            tx,
-                            order_uid=fee[2].hex(),
-                            token_address=fee[3].hex(),
-                            fee=fee[4],
-                            kind=fee[5]
-                        )
-                        
+                    # fees = compute_all_fees(
+                    #     HexBytes(tx), onchain_fetcher, offchain_fetcher
+                    # )
+                    # for fee in fees:
+                    #     write_fees_to_db(
+                    #         chain_name,
+                    #         solver_slippage_db_connection,
+                    #         auction_id,
+                    #         block_number,
+                    #         tx,
+                    #         order_uid=fee[2].hex(),
+                    #         token_address=fee[3].hex(),
+                    #         fee=fee[4],
+                    #         kind=fee[5],
+                    #     )
+
                     # Append imbalances to a single log message
                     if imbalances is not None:
                         log_message = [f"Token Imbalances on {chain_name} for tx {tx}:"]
@@ -354,13 +299,9 @@ def process_transactions(chain_name: str) -> None:
                                     token_address,
                                     imbalance,
                                 )
-                                # log_message.append(
-                                #     f"Token: {token_address}, Imbalance: {imbalance}"
-                                # )
                                 log_message.append(
                                     f"Token: {token_address}, Imbalance: {imbalance}, ETH value: {get_price(block_number, token_address, imbalance)}"
                                 )
-                                # logger.info(f"Token: {token_address}, Imbalance: {imbalance}, ETH value: {get_price(block_number, token_address, imbalance)}")
                         logger.info("\n".join(log_message))
                     else:
                         raise ValueError("Imbalances computation returned None.")
