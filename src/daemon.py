@@ -299,12 +299,12 @@ def process_transactions(chain_name: str) -> None:
                                     token_address,
                                     imbalance,
                                 )
-                                log_message.append(
-                                    f"Token: {token_address}, Imbalance: {imbalance}, ETH value: {get_price(block_number, token_address, imbalance)}"
-                                )
+                            log_message.append(
+                               f"Token: {token_address}, Imbalance: {imbalance}"
+                            )
                         logger.info("\n".join(log_message))
                     else:
-                        raise ValueError("Imbalances computation returned None.")
+                       raise ValueError("Imbalances computation returned None.")
                 except ValueError as e:
                     logger.error("ValueError: %s", e)
                     unprocessed_txs.append((tx, auction_id, block_number))
