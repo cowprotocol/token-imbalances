@@ -11,3 +11,4 @@ pytest==7.4.0
 setuptools
 pandas-stubs
 types-psycopg2
+types-requests
