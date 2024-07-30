@@ -1,17 +1,12 @@
 import os
+from typing import Optional
 import requests
 import json
-from dotenv import load_dotenv
 from web3 import Web3
-from src.helper_functions import get_web3_instance
-from src.config import check_db_connection, logger
+from src.config import logger
 from src.constants import NATIVE_ETH_TOKEN_ADDRESS
-from src.config import create_db_connection
 
-load_dotenv()
-
-solver_slippage_db_connection = create_db_connection("solver_slippage")
-backend_db_connection = create_db_connection("backend")
+coingecko_api_key = os.getenv("COINGECKO_API_KEY")
 
 
 def load_cleaned_token_list(file_path):
@@ -26,22 +21,36 @@ def get_token_id_by_address(cleaned_token_list, token_address):
     return None
 
 
-def get_api_price(token_id: str, start_timestamp: int, end_timestamp: int):
+def get_api_price(
+    token_id: str, start_timestamp: int, end_timestamp: int
+) -> Optional[float]:
     """
     Makes call to Coingecko API to fetch price, between a start and end timestamp.
     """
-    url = f"https://pro-api.coingecko.com/api/v3/coins/{token_id}/market_chart/range?vs_currency=eth&from={start_timestamp}&to={end_timestamp}"
+    if not coingecko_api_key:
+        logger.warning("Coingecko API key is not set.")
+        return None
+    # price of token is returned in ETH
+    url = (
+        f"https://pro-api.coingecko.com/api/v3/coins/{token_id}/market_chart/range"
+        f"?vs_currency=eth&from={start_timestamp}&to={end_timestamp}"
+    )
     headers = {
         "accept": "application/json",
-        "x-cg-pro-api-key": os.getenv("COINGECKO_API_KEY"),
+        "x-cg-pro-api-key": coingecko_api_key,
     }
-    response = requests.get(url, headers=headers)
-    response.raise_for_status()
-    data = response.json()
-    if len(data["prices"]) != 0:
-        price = data["prices"][0][1]
-        return price
-    return None
+    try:
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()
+        data = response.json()
+        # return available coingecko price, which is the closest to the block timestamp
+        if len(data["prices"]) != 0:
+            price = data["prices"][0][1]
+            return price
+        return None
+    except requests.RequestException as e:
+        logger.warning(f"Error fetching price from Coingecko API: {e}")
+        return None
 
 
 def get_price(web3: Web3, block_number: int, token_address: str, tx_hash: str):
@@ -52,8 +61,11 @@ def get_price(web3: Web3, block_number: int, token_address: str, tx_hash: str):
     cleaned_token_list = load_cleaned_token_list(
         "src/coingecko_tokens_list/filtered_coingecko_list.json"
     )
-    token_address = token_address.lower()
+    # Coingecko doesn't store ETH address, which occurs commonly in imbalances.
+    if Web3.to_checksum_address(token_address) == NATIVE_ETH_TOKEN_ADDRESS:
+        return 1.0
 
+    token_address = token_address.lower()
     data = web3.eth.get_block(block_number)
     start_timestamp = data["timestamp"]
     # We need to provide a sufficient buffer time for fetching 5-minutely prices from coingecko.
