@@ -9,134 +9,22 @@ from web3 import Web3
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
 from src.imbalances_script import RawTokenImbalances
+from src.helper_functions import (
+    get_finalized_block_number,
+)
 from src.config import (
+    initialize_connections,
     CHAIN_SLEEP_TIME,
-    NODE_URL,
-    create_db_connection,
     check_db_connection,
     logger,
 )
+from src.coingecko_pricing import get_price
 
 
-def get_web3_instance() -> Web3:
-    """
-    returns a Web3 instance for the given blockchain via chain name.
-    """
-    return Web3(Web3.HTTPProvider(NODE_URL))
-
-
-def get_finalized_block_number(web3: Web3) -> int:
-    """
-    Get the number of the most recent finalized block.
-    """
-    return web3.eth.block_number - 67
-
-
-def fetch_tx_data(
-    backend_db_connection: Engine, start_block: int, end_block: int
-) -> List[Tuple[str, int, int]]:
-    """Fetch transaction hashes beginning from start_block to end_block."""
-
-    backend_db_connection = check_db_connection(backend_db_connection, "backend")
-
-    query = f"""
-    SELECT tx_hash, auction_id, block_number
-    FROM settlements
-    WHERE block_number >= {start_block}
-    AND block_number <= {end_block}
-    """
-    db_data = pd.read_sql(query, backend_db_connection)
-    # converts hashes at memory location to hex
-    db_data["tx_hash"] = db_data["tx_hash"].apply(lambda x: f"0x{x.hex()}")
-
-    # return (tx hash, auction id) as tx_data
-    tx_data = [
-        (row["tx_hash"], row["auction_id"], row["block_number"])
-        for index, row in db_data.iterrows()
-    ]
-    return tx_data
-
-
-def record_exists(
-    solver_slippage_connection: Engine,
-    tx_hash_bytes: bytes,
-    token_address_bytes: bytes,
-) -> bool:
-    """
-    Check if a record with the given (tx_hash, token_address) already exists in the database.
-    """
-    solver_slippage_connection = check_db_connection(
-        solver_slippage_connection, "solver_slippage"
-    )
-
-    query = text(
-        """
-        SELECT 1 FROM raw_token_imbalances
-        WHERE tx_hash = :tx_hash AND token_address = :token_address
-    """
-    )
-    try:
-        with solver_slippage_connection.connect() as connection:
-            result = connection.execute(
-                query, {"tx_hash": tx_hash_bytes, "token_address": token_address_bytes}
-            )
-            record_exists = result.fetchone() is not None
-            return record_exists
-    except Exception as e:
-        logger.error("Error checking record existence: %s", e)
-        return False
-
-
-def write_token_imbalances_to_db(
-    chain_name: str,
-    solver_slippage_connection: Engine,
-    auction_id: int,
-    block_number: int,
-    tx_hash: str,
-    token_address: str,
-    imbalance: float,
-) -> None:
-    """
-    Write token imbalances to the database if the (tx_hash, token_address) combination does not already exist.
-    """
-    solver_slippage_connection = check_db_connection(
-        solver_slippage_connection, "solver_slippage"
-    )
-
-    tx_hash_bytes = bytes.fromhex(tx_hash[2:])
-    token_address_bytes = bytes.fromhex(token_address[2:])
-    if not record_exists(
-        solver_slippage_connection, tx_hash_bytes, token_address_bytes
-    ):
-        insert_sql = text(
-            """
-            INSERT INTO raw_token_imbalances (auction_id, chain_name, block_number, tx_hash, token_address, imbalance)
-            VALUES (:auction_id, :chain_name, :block_number, :tx_hash, :token_address, :imbalance)
-        """
-        )
-        try:
-            with solver_slippage_connection.connect() as connection:
-                connection.execute(
-                    insert_sql,
-                    {
-                        "auction_id": auction_id,
-                        "chain_name": chain_name,
-                        "block_number": block_number,
-                        "tx_hash": tx_hash_bytes,
-                        "token_address": token_address_bytes,
-                        "imbalance": imbalance,
-                    },
-                )
-                connection.commit()
-                logger.debug("Record inserted successfully.")
-        except Exception as e:
-            logger.error("Error inserting record: %s", e)
-    else:
-        logger.info(
-            "Record with tx_hash %s and token_address %s already exists.",
-            tx_hash,
-            token_address,
-        )
+def read_sql_file(file_path: str) -> str:
+    """This function reads an SQL file and returns its content in string format"""
+    with open(file_path, "r") as file:
+        return file.read()
 
 
 def get_start_block(
@@ -151,16 +39,12 @@ def get_start_block(
         solver_slippage_connection = check_db_connection(
             solver_slippage_connection, "solver_slippage"
         )
-
-        query_max_block = text(
-            """
-            SELECT MAX(block_number) FROM raw_token_imbalances
-            WHERE chain_name = :chain_name
-        """
-        )
+        query_max_block = read_sql_file("src/sql/select_max_block.sql")
 
         with solver_slippage_connection.connect() as connection:
-            result = connection.execute(query_max_block, {"chain_name": chain_name})
+            result = connection.execute(
+                text(query_max_block), {"chain_name": chain_name}
+            )
             row = result.fetchone()
             max_block = (
                 row[0] if row is not None else None
@@ -173,14 +57,12 @@ def get_start_block(
                 return get_finalized_block_number(web3)
 
             # delete entries for the max block from the table
-            delete_sql = text(
-                """
-                DELETE FROM raw_token_imbalances WHERE chain_name = :chain_name AND block_number = :block_number
-            """
-            )
+            delete_sql = read_sql_file("src/sql/delete_entries_max_block.sql")
+
             try:
                 connection.execute(
-                    delete_sql, {"chain_name": chain_name, "block_number": max_block}
+                    text(delete_sql),
+                    {"chain_name": chain_name, "block_number": max_block},
                 )
                 connection.commit()
                 logger.debug(
@@ -197,19 +79,151 @@ def get_start_block(
         return get_finalized_block_number(web3)
 
 
+def fetch_tx_data(
+    backend_db_connection: Engine, start_block: int, end_block: int
+) -> List[Tuple[str, int, int]]:
+    """
+    Fetch transaction data beginning from start_block to end_block.
+    Returns (tx_hash, auction_id, block_number) as a tuple.
+    """
+
+    backend_db_connection = check_db_connection(backend_db_connection, "backend")
+    query = read_sql_file("src/sql/select_transactions.sql")
+
+    db_data = pd.read_sql(
+        text(query),
+        backend_db_connection,
+        params={"start_block": start_block, "end_block": end_block},
+    )
+    # converts hashes at memory location to hex
+    db_data["tx_hash"] = db_data["tx_hash"].apply(lambda x: f"0x{x.hex()}")
+
+    # return (tx hash, auction id) as tx_data
+    tx_data = [
+        (row["tx_hash"], row["auction_id"], row["block_number"])
+        for index, row in db_data.iterrows()
+    ]
+    return tx_data
+
+
+def record_exists(
+    solver_slippage_connection: Engine,
+    tx_hash: bytes,
+    token_address: bytes,
+) -> bool:
+    """
+    Check if a record with the given (tx_hash, token_address) already exists in the database.
+    """
+    solver_slippage_connection = check_db_connection(
+        solver_slippage_connection, "solver_slippage"
+    )
+    query = read_sql_file("src/sql/select_record_exists.sql")
+
+    try:
+        with solver_slippage_connection.connect() as connection:
+            result = connection.execute(
+                text(query), {"tx_hash": tx_hash, "token_address": token_address}
+            )
+            record_exists = result.fetchone() is not None
+            return record_exists
+    except Exception as e:
+        logger.error("Error checking record existence: %s", e)
+        return False
+
+
+def write_token_imbalances_to_db(
+    chain_name: str,
+    solver_slippage_connection: Engine,
+    auction_id: int,
+    block_number: int,
+    tx_hash: bytes,
+    token_address: bytes,
+    imbalance: float,
+) -> None:
+    """
+    Write token imbalances to the database if the (tx_hash, token_address) combination does not already exist.
+    """
+    solver_slippage_connection = check_db_connection(
+        solver_slippage_connection, "solver_slippage"
+    )
+    query = read_sql_file("src/sql/insert_raw_token_imbalances.sql")
+
+    if not record_exists(solver_slippage_connection, tx_hash, token_address):
+        try:
+            with solver_slippage_connection.connect() as connection:
+                connection.execute(
+                    text(query),
+                    {
+                        "auction_id": auction_id,
+                        "chain_name": chain_name,
+                        "block_number": block_number,
+                        "tx_hash": tx_hash,
+                        "token_address": token_address,
+                        "imbalance": imbalance,
+                    },
+                )
+                connection.commit()
+                logger.debug("Record inserted successfully.")
+        except Exception as e:
+            logger.error("Error inserting record: %s", e)
+    else:
+        logger.info(
+            "Record with tx_hash %s and token_address %s already exists.",
+            tx_hash,
+            token_address,
+        )
+
+
+def write_coingecko_prices(
+    chain_name: str,
+    solver_slippage_connection: Engine,
+    block_number: int,
+    tx_hash: bytes,
+    token_address: bytes,
+    coingecko_price: float,
+) -> None:
+    """
+    Write coingecko prices to the table.
+    """
+    solver_slippage_connection = check_db_connection(
+        solver_slippage_connection, "solver_slippage"
+    )
+    query = read_sql_file("src/sql/insert_coingecko_price.sql")
+
+    try:
+        with solver_slippage_connection.connect() as connection:
+            connection.execute(
+                text(query),
+                {
+                    "chain_name": chain_name,
+                    "block_number": block_number,
+                    "tx_hash": tx_hash,
+                    "token_address": token_address,
+                    "coingecko_price": coingecko_price,
+                },
+            )
+            connection.commit()
+            logger.debug("Record inserted successfully into prices table.")
+    except Exception as e:
+        logger.error("Error inserting record: %s", e)
+
+
 def process_transactions(chain_name: str) -> None:
     """
     Process transactions to compute imbalances for a given blockchain via chain name.
     """
-    web3 = get_web3_instance()
+    (
+        web3,
+        solver_slippage_db_connection,
+        backend_db_connection,
+    ) = initialize_connections()
     rt = RawTokenImbalances(web3, chain_name)
-    backend_db_connection = create_db_connection("backend")
-    solver_slippage_db_connection = create_db_connection("solver_slippage")
     start_block = get_start_block(chain_name, solver_slippage_db_connection, web3)
     previous_block = start_block
     unprocessed_txs: List[Tuple[str, int, int]] = []
 
     logger.info("%s Daemon started. Start block: %d", chain_name, start_block)
+
     while True:
         try:
             latest_block = get_finalized_block_number(web3)
@@ -218,25 +232,41 @@ def process_transactions(chain_name: str) -> None:
             all_txs = new_txs + unprocessed_txs
             unprocessed_txs.clear()
 
-            for tx, auction_id, block_number in all_txs:
-                logger.info("Processing transaction on %s: %s", chain_name, tx)
+            for tx_hash, auction_id, block_number in all_txs:
+                logger.info("Processing transaction on %s: %s", chain_name, tx_hash)
                 try:
-                    imbalances = rt.compute_imbalances(tx)
-                    # Append imbalances to a single log message
+                    imbalances = rt.compute_imbalances(tx_hash)
                     if imbalances is not None:
-                        log_message = [f"Token Imbalances on {chain_name} for tx {tx}:"]
+                        log_message = [
+                            f"Token Imbalances on {chain_name} for tx {tx_hash}:"
+                        ]
                         for token_address, imbalance in imbalances.items():
                             # Ignore tokens that have null imbalances
                             if imbalance != 0:
+                                tx_hash_bytes = bytes.fromhex(tx_hash[2:])
+                                token_address_bytes = bytes.fromhex(token_address[2:])
                                 write_token_imbalances_to_db(
                                     chain_name,
                                     solver_slippage_db_connection,
                                     auction_id,
                                     block_number,
-                                    tx,
-                                    token_address,
+                                    tx_hash_bytes,
+                                    token_address_bytes,
                                     imbalance,
                                 )
+                                coingecko_price = get_price(
+                                    web3, block_number, token_address, tx_hash
+                                )
+                                if coingecko_price is not None:
+                                    write_coingecko_prices(
+                                        chain_name,
+                                        solver_slippage_db_connection,
+                                        block_number,
+                                        tx_hash_bytes,
+                                        token_address_bytes,
+                                        coingecko_price,
+                                    )
+
                                 log_message.append(
                                     f"Token: {token_address}, Imbalance: {imbalance}"
                                 )
@@ -245,14 +275,16 @@ def process_transactions(chain_name: str) -> None:
                         raise ValueError("Imbalances computation returned None.")
                 except ValueError as e:
                     logger.error("ValueError: %s", e)
-                    unprocessed_txs.append((tx, auction_id, block_number))
+                    unprocessed_txs.append((tx_hash, auction_id, block_number))
             previous_block = latest_block + 1
         except ConnectionError as e:
             logger.error(
                 "Connection error processing transactions on %s: %s", chain_name, e
             )
         except Exception as e:
-            logger.error("Error processing transactions on %s: %s", chain_name, e)
+            logger.error(
+                "Error processing transactions %s on %s: %s", tx_hash, chain_name, e
+            )
 
         if CHAIN_SLEEP_TIME is not None:
             time.sleep(CHAIN_SLEEP_TIME)
