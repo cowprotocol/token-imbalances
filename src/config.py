@@ -13,7 +13,7 @@ logger = get_logger("raw_token_imbalances")
 
 # Utilized by imbalances_script for computing for single tx hash
 CHAIN_RPC_ENDPOINTS = {
-    "Ethereum": os.getenv("ETHEREUM_NODE_URL"),
+    "Ethereum": os.getenv("NODE_URL"),
     "Gnosis": os.getenv("GNOSIS_NODE_URL"),
 }
 

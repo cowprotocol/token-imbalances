@@ -40,6 +40,7 @@ EVENT_TOPICS = {
     "Transfer": "Transfer(address,address,uint256)",
     "ERC20Transfer": "ERC20Transfer(address,address,uint256)",
     "WithdrawalWETH": "Withdrawal(address,uint256)",
+    "DepositWETH": "Deposit(address,uint256)",
     "DepositSDAI": "Deposit(address,address,uint256,uint256)",
     "WithdrawSDAI": "Withdraw(address,address,address,uint256,uint256)",
 }
@@ -111,14 +112,10 @@ class RawTokenImbalances:
         """Identify transfer events in trace involving the specified contract."""
         normalized_address = Web3.to_checksum_address(address)
         actions = []
-        # input_field = '0x' denotes a native ETH transfer event, which we want to filter for
-        input_field: str = "0x"
         for trace in traces:
             if isinstance(trace, AttributeDict):
                 action = trace.get("action", {})
-                input_value = action.get("input", b"").hex()
-                # filter out action if involved in an ETH transfer event
-                if input_value == input_field and (
+                if (
                     Web3.to_checksum_address(action.get("from", ""))
                     == normalized_address
                     or Web3.to_checksum_address(action.get("to", ""))
@@ -150,7 +147,7 @@ class RawTokenImbalances:
         transfer_topics = {
             k: v for k, v in event_topics.items() if k in ["Transfer", "ERC20Transfer"]
         }
-        # other_topics is used to find imbalances for SDAI, ETH txss
+        # other_topics is used to find imbalances for SDAI, ETH transactions
         other_topics = {
             k: v for k, v in event_topics.items() if k not in transfer_topics
         }
@@ -190,7 +187,7 @@ class RawTokenImbalances:
                     "0x" + event["topics"][2].hex()[-40:]
                 )
                 return from_address, to_address, value
-            else:  # Withdrawal event
+            else:  # Withdrawal or Deposit event for our purpose
                 return from_address, None, value
         except Exception as e:
             logger.error("Error decoding event: %s", str(e))
@@ -207,6 +204,10 @@ class RawTokenImbalances:
         from_address, to_address, value = self.decode_event(event)
         if from_address is None or to_address is None:
             return
+        if to_address == from_address == address:
+            # adds a positive amount of sell token entering the contract (fee withdrawal txs)
+            inflows[event["address"]] = inflows.get(event["address"], 0) + value
+            return
         if to_address == address:
             inflows[event["address"]] = inflows.get(event["address"], 0) + value
         if from_address == address:
@@ -216,7 +217,7 @@ class RawTokenImbalances:
         self, events: Dict[str, List[Dict]], address: str
     ) -> Dict[str, int]:
         """Calculate token imbalances from events."""
-        inflows, outflows = {}, {}  # type: (dict, dict)
+        inflows, outflows = {}, {}
         for event in events["Transfer"]:
             self.process_event(event, inflows, outflows, address)
 
@@ -235,14 +236,18 @@ class RawTokenImbalances:
         address: str,
     ) -> None:
         """Update the WETH imbalance in imbalances."""
-        weth_inflow = imbalances.get(WETH_TOKEN_ADDRESS, 0)
-        weth_outflow = 0
-        weth_withdrawals = 0
-        for event in events["WithdrawalWETH"]:
+        weth_transfer_imbalance = imbalances.get(WETH_TOKEN_ADDRESS, 0)
+        weth_withdrawals, weth_deposits = 0, 0
+        for event in events["WithdrawalWETH"] + events["DepositWETH"]:
             from_address, _, value = self.decode_event(event)
             if from_address == address:
-                weth_withdrawals += value
-        imbalances[WETH_TOKEN_ADDRESS] = weth_inflow - weth_outflow - weth_withdrawals
+                if event in events["WithdrawalWETH"]:
+                    weth_withdrawals += value
+                elif event in events["DepositWETH"]:
+                    weth_deposits += value
+        imbalances[WETH_TOKEN_ADDRESS] = (
+            weth_transfer_imbalance - weth_withdrawals + weth_deposits
+        )
 
     def update_native_eth_imbalance(
         self, imbalances: Dict[str, int], native_eth_imbalance: Optional[int]
@@ -285,12 +290,20 @@ class RawTokenImbalances:
         self, events: Dict[str, List[Dict]], imbalances: Dict[str, int]
     ) -> None:
         """Update the sDAI imbalance in imbalances."""
-        for event in events["DepositSDAI"]:
-            if event["address"] == SDAI_TOKEN_ADDRESS:
-                self.process_sdai_event(event, imbalances, is_deposit=True)
-        for event in events["WithdrawSDAI"]:
-            if event["address"] == SDAI_TOKEN_ADDRESS:
-                self.process_sdai_event(event, imbalances, is_deposit=False)
+
+        def filter_sdai_events(event_list: List[Dict], is_deposit: bool) -> None:
+            for event in event_list:
+                if event["address"] == SDAI_TOKEN_ADDRESS:
+                    for topic in event["topics"]:
+                        if (
+                            Web3.to_checksum_address("0x" + topic.hex()[-40:])
+                            == SETTLEMENT_CONTRACT_ADDRESS
+                        ):
+                            self.process_sdai_event(event, imbalances, is_deposit)
+                            break
+
+        filter_sdai_events(events["DepositSDAI"], is_deposit=True)
+        filter_sdai_events(events["WithdrawSDAI"], is_deposit=False)
 
     def compute_imbalances(self, tx_hash: str) -> Optional[Dict[str, int]]:
         try:
