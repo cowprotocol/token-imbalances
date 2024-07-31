@@ -56,7 +56,7 @@ def get_api_price(
 def get_price(web3: Web3, block_number: int, token_address: str, tx_hash: str):
     """
     Function returns coingecko price for a token address,
-    closest to block timestamp for a given tx hash.
+    closest to and at least as large as the block timestamp for a given tx hash.
     """
     cleaned_token_list = load_cleaned_token_list(
         "src/coingecko_tokens_list/filtered_coingecko_list.json"
