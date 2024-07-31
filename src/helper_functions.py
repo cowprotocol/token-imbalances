@@ -5,9 +5,11 @@ from __future__ import annotations
 import sys
 import os
 import logging
-from typing import Optional
+from typing import List, Optional, Tuple
 from dotenv import load_dotenv
+from hexbytes import HexBytes
 from web3 import Web3
+from src.constants import SETTLEMENT_CONTRACT_ADDRESS
 
 load_dotenv()
 NODE_URL = os.getenv("NODE_URL")
@@ -65,3 +67,35 @@ def get_finalized_block_number(web3: Web3) -> int:
     Get the number of the most recent finalized block.
     """
     return web3.eth.block_number - 67
+
+
+def get_tx_hashes_blocks(
+    web3: Web3, start_block: int, end_block: int
+) -> List[Tuple[str, int]]:
+    """
+    Get all transaction hashes appended with corresponding block (tuple) transactions
+    involving the settlement contract.
+    """
+    tx_hashes_blocks = []
+
+    for block_number in range(start_block, end_block + 1):
+        block = web3.eth.get_block(block_number, full_transactions=True)
+        for tx in block.transactions:  # type: ignore[attr-defined]
+            if tx.to and tx.to.lower() == SETTLEMENT_CONTRACT_ADDRESS.lower():
+                tx_hashes_blocks.append((tx.hash.hex(), block_number))
+    return tx_hashes_blocks
+
+
+def get_auction_id(web3: Web3, tx_hash: str) -> int:
+    """
+    Method that finds an auction id given a transaction hash.
+    """
+    transaction = web3.eth.get_transaction(HexBytes(tx_hash))
+    call_data = transaction["input"]
+    # convert call_data to hexString if it's in hexBytes
+    call_data_bytes = bytes.fromhex(
+        call_data.hex()[2:] if isinstance(call_data, HexBytes) else call_data[2:]
+    )
+    # convert bytes to int
+    auction_id = int.from_bytes(call_data_bytes[-8:], byteorder="big")
+    return auction_id

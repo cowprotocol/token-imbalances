@@ -68,9 +68,8 @@ def check_db_connection(connection: Engine, db_type: str) -> Engine:
     return connection
 
 
-def initialize_connections() -> Tuple[Web3, Engine, Engine]:
+def initialize_connections() -> Tuple[Web3, Engine]:
     web3 = get_web3_instance()
     solver_slippage_db_connection = create_db_connection("solver_slippage")
-    backend_db_connection = create_db_connection("backend")
 
-    return web3, solver_slippage_db_connection, backend_db_connection
+    return web3, solver_slippage_db_connection
