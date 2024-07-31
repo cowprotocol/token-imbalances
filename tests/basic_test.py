@@ -1,7 +1,11 @@
 """ Runs a basic test for raw imbalance calculation edge-cases. """
+import os
+from dotenv import load_dotenv
 import pytest
 from src.imbalances_script import RawTokenImbalances
+from src.helper_functions import get_web3_instance
 
+load_dotenv()
 
 @pytest.mark.parametrize(
     "tx_hash, expected_imbalances",
@@ -31,13 +35,24 @@ from src.imbalances_script import RawTokenImbalances
                 "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2": 64641750602289665,
             },
         ),
+        # Fee Withdrawal Transaction
+        (
+            "0x6c83fe83684b6f8ad0f8141aa4c359ad359c09b14c8ff9b9b2a0a80228ed10de",
+            {
+                "0x853d955aCEf822Db058eb8505911ED77F175b99e": 7064735278981936006,
+                "0x3472A5A71965499acd81997a54BBA8D852C6E53d": 2852137014171065178,
+                "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2": 4722264073109523,
+                "0x0f2D719407FdBeFF09D87557AbB7232601FD9F29": 10246847087992681796
+            },
+        ),
     ],
 )
 def test_imbalances(tx_hash, expected_imbalances):
     """
     Asserts imbalances match for main script with test values provided.
     """
-    rt = RawTokenImbalances()
-    imbalances, _ = rt.compute_imbalances(tx_hash)
+    chain_name = os.getenv("CHAIN_NAME")
+    rt = RawTokenImbalances(get_web3_instance(), chain_name)
+    imbalances = rt.compute_imbalances(tx_hash)
     for token_address, expected_imbalance in expected_imbalances.items():
         assert imbalances.get(token_address) == expected_imbalance
