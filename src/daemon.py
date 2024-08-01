@@ -4,12 +4,16 @@ Running this daemon computes raw imbalances for finalized blocks by calling imba
 import os
 import time
 from typing import List, Tuple
-import pandas as pd
 from web3 import Web3
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
 from src.imbalances_script import RawTokenImbalances
-from src.helper_functions import get_finalized_block_number, read_sql_file
+from src.helper_functions import (
+    get_finalized_block_number,
+    get_tx_hashes_blocks,
+    get_auction_id,
+    read_sql_file,
+)
 from src.config import (
     initialize_connections,
     CHAIN_SLEEP_TIME,
@@ -20,7 +24,7 @@ from src.coingecko_pricing import get_price
 
 
 def get_start_block(
-    chain_name: str, solver_slippage_connection: Engine, web3: Web3
+    web3: Web3, chain_name: str, solver_slippage_connection: Engine
 ) -> int:
     """
     Retrieve the most recent block already present in raw_token_imbalances table,
@@ -72,29 +76,22 @@ def get_start_block(
 
 
 def fetch_tx_data(
-    backend_db_connection: Engine, start_block: int, end_block: int
+    web3: Web3, start_block: int, end_block: int
 ) -> List[Tuple[str, int, int]]:
     """
     Fetch transaction data beginning from start_block to end_block.
     Returns (tx_hash, auction_id, block_number) as a tuple.
     """
+    tx_data: List[Tuple[str, int, int]] = []
+    tx_hashes_blocks = get_tx_hashes_blocks(web3, start_block, end_block)
 
-    backend_db_connection = check_db_connection(backend_db_connection, "backend")
-    query = read_sql_file("src/sql/select_transactions.sql")
+    for tx_hash, block_number in tx_hashes_blocks:
+        try:
+            auction_id = get_auction_id(web3, tx_hash)
+            tx_data.append((tx_hash, auction_id, block_number))
+        except Exception as e:
+            print(f"Error fetching auction ID for {tx_hash}: {e}")
 
-    db_data = pd.read_sql(
-        text(query),
-        backend_db_connection,
-        params={"start_block": start_block, "end_block": end_block},
-    )
-    # converts hashes at memory location to hex
-    db_data["tx_hash"] = db_data["tx_hash"].apply(lambda x: f"0x{x.hex()}")
-
-    # return (tx hash, auction id) as tx_data
-    tx_data = [
-        (row["tx_hash"], row["auction_id"], row["block_number"])
-        for index, row in db_data.iterrows()
-    ]
     return tx_data
 
 
@@ -133,7 +130,8 @@ def write_token_imbalances_to_db(
     imbalance: float,
 ) -> None:
     """
-    Write token imbalances to the database if the (tx_hash, token_address) combination does not already exist.
+    Write token imbalances to the database if the (tx_hash, token_address) pair does not already exist.
+    This is done by first calling record_exists().
     """
     solver_slippage_connection = check_db_connection(
         solver_slippage_connection, "solver_slippage"
@@ -207,10 +205,9 @@ def process_transactions(chain_name: str) -> None:
     (
         web3,
         solver_slippage_db_connection,
-        backend_db_connection,
     ) = initialize_connections()
     rt = RawTokenImbalances(web3, chain_name)
-    start_block = get_start_block(chain_name, solver_slippage_db_connection, web3)
+    start_block = get_start_block(web3, chain_name, solver_slippage_db_connection)
     previous_block = start_block
     unprocessed_txs: List[Tuple[str, int, int]] = []
 
@@ -219,7 +216,7 @@ def process_transactions(chain_name: str) -> None:
     while True:
         try:
             latest_block = get_finalized_block_number(web3)
-            new_txs = fetch_tx_data(backend_db_connection, previous_block, latest_block)
+            new_txs = fetch_tx_data(web3, previous_block, latest_block)
             # Add any unprocessed txs for processing, then clear list of unprocessed
             all_txs = new_txs + unprocessed_txs
             unprocessed_txs.clear()
