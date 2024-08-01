@@ -207,7 +207,8 @@ def process_transactions(chain_name: str) -> None:
         solver_slippage_db_connection,
     ) = initialize_connections()
     rt = RawTokenImbalances(web3, chain_name)
-    start_block = get_start_block(web3, chain_name, solver_slippage_db_connection)
+    # start_block = get_start_block(web3, chain_name, solver_slippage_db_connection)
+    start_block = 20417850
     previous_block = start_block
     unprocessed_txs: List[Tuple[str, int, int]] = []
 
