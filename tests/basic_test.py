@@ -7,6 +7,7 @@ from src.helper_functions import get_web3_instance
 
 load_dotenv()
 
+
 @pytest.mark.parametrize(
     "tx_hash, expected_imbalances",
     [
@@ -42,7 +43,7 @@ load_dotenv()
                 "0x853d955aCEf822Db058eb8505911ED77F175b99e": 7064735278981936006,
                 "0x3472A5A71965499acd81997a54BBA8D852C6E53d": 2852137014171065178,
                 "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2": 4722264073109523,
-                "0x0f2D719407FdBeFF09D87557AbB7232601FD9F29": 10246847087992681796
+                "0x0f2D719407FdBeFF09D87557AbB7232601FD9F29": 10246847087992681796,
             },
         ),
     ],
