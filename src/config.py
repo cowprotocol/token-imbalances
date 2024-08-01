@@ -1,9 +1,11 @@
 import os
+from typing import Tuple
 from sqlalchemy import text
 from sqlalchemy.exc import OperationalError
 from sqlalchemy import create_engine, Engine
 from dotenv import load_dotenv
-from src.helper_functions import get_logger
+from web3 import Web3
+from src.helper_functions import get_logger, get_web3_instance
 
 
 load_dotenv()
@@ -64,3 +66,11 @@ def check_db_connection(connection: Engine, db_type: str) -> Engine:
         # if connection is closed, create new one
         connection = create_db_connection(db_type)
     return connection
+
+
+def initialize_connections() -> Tuple[Web3, Engine, Engine]:
+    web3 = get_web3_instance()
+    solver_slippage_db_connection = create_db_connection("solver_slippage")
+    backend_db_connection = create_db_connection("backend")
+
+    return web3, solver_slippage_db_connection, backend_db_connection

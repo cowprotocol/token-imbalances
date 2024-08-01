@@ -2,3 +2,4 @@
 __pycache__
 .pytest_cache
 src/tempCodeRunnerFile.py
+.DS_Store

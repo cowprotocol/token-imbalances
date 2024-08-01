@@ -3,8 +3,14 @@ This file contains some auxiliary functions
 """
 from __future__ import annotations
 import sys
+import os
 import logging
 from typing import Optional
+from dotenv import load_dotenv
+from web3 import Web3
+
+load_dotenv()
+NODE_URL = os.getenv("NODE_URL")
 
 
 def get_logger(filename: Optional[str] = None) -> logging.Logger:
@@ -45,3 +51,23 @@ def get_logger(filename: Optional[str] = None) -> logging.Logger:
         logger.addHandler(file_handler)
 
     return logger
+
+
+def get_web3_instance() -> Web3:
+    """
+    returns a Web3 instance for the given blockchain via chain name.
+    """
+    return Web3(Web3.HTTPProvider(NODE_URL))
+
+
+def get_finalized_block_number(web3: Web3) -> int:
+    """
+    Get the number of the most recent finalized block.
+    """
+    return web3.eth.block_number - 67
+
+
+def read_sql_file(file_path: str) -> str:
+    """This function reads a file (SQL) and returns its content as a string."""
+    with open(file_path, "r") as file:
+        return file.read()
