@@ -12,7 +12,7 @@ from src.helper_functions import (
     get_finalized_block_number,
     get_tx_hashes_blocks,
     get_auction_id,
-    read_sql_file
+    read_sql_file,
 )
 from src.config import (
     initialize_connections,
