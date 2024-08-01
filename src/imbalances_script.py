@@ -100,7 +100,7 @@ class RawTokenImbalances:
             return None
 
     def get_transaction_trace(self, tx_hash: str) -> Optional[List[Dict]]:
-        """Function used for retreiving trace to identify ETH transfers."""
+        """Function used for retreiving trace to identify native ETH transfers."""
         try:
             res = self.web3.tracing.trace_transaction(tx_hash)
             return res
@@ -231,23 +231,19 @@ class RawTokenImbalances:
     def update_weth_imbalance(
         self,
         events: Dict[str, List[Dict]],
-        actions: List[Dict],
         imbalances: Dict[str, int],
         address: str,
     ) -> None:
         """Update the WETH imbalance in imbalances."""
-        weth_transfer_imbalance = imbalances.get(WETH_TOKEN_ADDRESS, 0)
-        weth_withdrawals, weth_deposits = 0, 0
+        weth_imbalance = imbalances.get(WETH_TOKEN_ADDRESS, 0)
         for event in events["WithdrawalWETH"] + events["DepositWETH"]:
             from_address, _, value = self.decode_event(event)
             if from_address == address:
                 if event in events["WithdrawalWETH"]:
-                    weth_withdrawals += value
+                    weth_imbalance -= value
                 elif event in events["DepositWETH"]:
-                    weth_deposits += value
-        imbalances[WETH_TOKEN_ADDRESS] = (
-            weth_transfer_imbalance - weth_withdrawals + weth_deposits
-        )
+                    weth_imbalance += value
+        imbalances[WETH_TOKEN_ADDRESS] = weth_imbalance
 
     def update_native_eth_imbalance(
         self, imbalances: Dict[str, int], native_eth_imbalance: Optional[int]
@@ -332,7 +328,7 @@ class RawTokenImbalances:
 
             if actions:
                 self.update_weth_imbalance(
-                    events, actions, imbalances, SETTLEMENT_CONTRACT_ADDRESS
+                    events, imbalances, SETTLEMENT_CONTRACT_ADDRESS
                 )
                 self.update_native_eth_imbalance(imbalances, native_eth_imbalance)
 

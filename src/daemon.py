@@ -12,6 +12,7 @@ from src.helper_functions import (
     get_finalized_block_number,
     get_tx_hashes_blocks,
     get_auction_id,
+    read_sql_file
 )
 from src.config import (
     initialize_connections,
@@ -20,12 +21,6 @@ from src.config import (
     logger,
 )
 from src.coingecko_pricing import get_price
-
-
-def read_sql_file(file_path: str) -> str:
-    """This function reads an SQL file and returns its content in string format"""
-    with open(file_path, "r") as file:
-        return file.read()
 
 
 def get_start_block(

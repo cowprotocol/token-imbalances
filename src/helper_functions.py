@@ -69,6 +69,7 @@ def get_finalized_block_number(web3: Web3) -> int:
     return web3.eth.block_number - 67
 
 
+
 def get_tx_hashes_blocks(
     web3: Web3, start_block: int, end_block: int
 ) -> List[Tuple[str, int]]:
@@ -99,3 +100,9 @@ def get_auction_id(web3: Web3, tx_hash: str) -> int:
     # convert bytes to int
     auction_id = int.from_bytes(call_data_bytes[-8:], byteorder="big")
     return auction_id
+  
+  
+def read_sql_file(file_path: str) -> str:
+    """This function reads a file (SQL) and returns its content as a string."""
+    with open(file_path, "r") as file:
+        return file.read()

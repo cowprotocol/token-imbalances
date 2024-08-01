@@ -8,10 +8,10 @@ from src.constants import NATIVE_ETH_TOKEN_ADDRESS
 
 coingecko_api_key = os.getenv("COINGECKO_API_KEY")
 
-
-def load_cleaned_token_list(file_path):
-    with open(file_path, "r") as f:
-        return json.load(f)
+# Load the coingecko token list
+cleaned_token_list_path = "src/coingecko_tokens_list/filtered_coingecko_list.json"
+with open(cleaned_token_list_path, "r") as f:
+    cleaned_token_list = json.load(f)
 
 
 def get_token_id_by_address(cleaned_token_list, token_address):
@@ -56,11 +56,8 @@ def get_api_price(
 def get_price(web3: Web3, block_number: int, token_address: str, tx_hash: str):
     """
     Function returns coingecko price for a token address,
-    closest to block timestamp for a given tx hash.
+    closest to and at least as large as the block timestamp for a given tx hash.
     """
-    cleaned_token_list = load_cleaned_token_list(
-        "src/coingecko_tokens_list/filtered_coingecko_list.json"
-    )
     # Coingecko doesn't store ETH address, which occurs commonly in imbalances.
     if Web3.to_checksum_address(token_address) == NATIVE_ETH_TOKEN_ADDRESS:
         return 1.0
