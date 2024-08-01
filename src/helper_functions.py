@@ -65,3 +65,9 @@ def get_finalized_block_number(web3: Web3) -> int:
     Get the number of the most recent finalized block.
     """
     return web3.eth.block_number - 67
+
+
+def read_sql_file(file_path: str) -> str:
+    """This function reads a file (SQL) and returns its content as a string."""
+    with open(file_path, "r") as file:
+        return file.read()
