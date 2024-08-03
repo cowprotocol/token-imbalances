@@ -67,7 +67,6 @@ def price_retrievable(web3: Web3, block_start_timestamp: int) -> bool:
     return (newest_block_timestamp - block_start_timestamp) > COINGECKO_TIME_LIMIT
 
 
-
 def get_price(web3: Web3, block_number: int, token_address: str, tx_hash: str):
     """
     Function returns coingecko price for a token address,
