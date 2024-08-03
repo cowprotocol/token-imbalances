@@ -4,7 +4,8 @@ import requests
 import json
 from web3 import Web3
 from src.config import logger
-from src.constants import NATIVE_ETH_TOKEN_ADDRESS
+from src.helper_functions import get_finalized_block_number
+from src.constants import NATIVE_ETH_TOKEN_ADDRESS, WETH_TOKEN_ADDRESS
 
 coingecko_api_key = os.getenv("COINGECKO_API_KEY")
 
@@ -21,7 +22,7 @@ def get_token_id_by_address(cleaned_token_list, token_address):
     return None
 
 
-def get_api_price(
+def fetch_api_price(
     token_id: str, start_timestamp: int, end_timestamp: int
 ) -> Optional[float]:
     """
@@ -53,30 +54,53 @@ def get_api_price(
         return None
 
 
+def price_retrievable(web3: Web3, block_start_timestamp: int) -> bool:
+    """
+    This function checks if the time elapsed between the latest block and block being processed
+    is less than 2 days, which is coingecko's time frame for fetching 5-minutely data.
+    """
+    # Time in seconds of 45 hours.
+    COINGECKO_TIME_LIMIT = 162000
+    newest_block_timestamp = web3.eth.get_block(get_finalized_block_number(web3))[
+        "timestamp"
+    ]
+    if (newest_block_timestamp - block_start_timestamp) > COINGECKO_TIME_LIMIT:
+        return True
+
+
 def get_price(web3: Web3, block_number: int, token_address: str, tx_hash: str):
     """
     Function returns coingecko price for a token address,
     closest to and at least as large as the block timestamp for a given tx hash.
     """
+
+    block_start_timestamp = web3.eth.get_block(block_number)["timestamp"]
+    if price_retrievable(web3, block_start_timestamp):
+        return None
+
     # Coingecko doesn't store ETH address, which occurs commonly in imbalances.
-    if Web3.to_checksum_address(token_address) == NATIVE_ETH_TOKEN_ADDRESS:
+    # Approximate WETH price as equal to ETH.
+    if Web3.to_checksum_address(token_address) in (
+        NATIVE_ETH_TOKEN_ADDRESS,
+        WETH_TOKEN_ADDRESS,
+    ):
         return 1.0
 
-    token_address = token_address.lower()
-    data = web3.eth.get_block(block_number)
-    start_timestamp = data["timestamp"]
     # We need to provide a sufficient buffer time for fetching 5-minutely prices from coingecko.
     # If too short, it's possible that no price may be returned. We use the first value returned,
     # which would be closest to block timestamp
     BUFFER_TIME = 600
-    end_timestamp = start_timestamp + BUFFER_TIME
+    block_end_timestamp = block_start_timestamp + BUFFER_TIME
 
+    token_address = token_address.lower()
     token_id = get_token_id_by_address(cleaned_token_list, token_address)
     if not token_id:
         logger.warning(f"Token ID not found for the given address: {token_address}")
         return None
     try:
-        api_price = get_api_price(token_id, start_timestamp, end_timestamp)
+        api_price = fetch_api_price(
+            token_id, block_start_timestamp, block_end_timestamp
+        )
         if api_price is None:
             logger.warning(f"API returned None for token ID: {token_id}")
             return None
