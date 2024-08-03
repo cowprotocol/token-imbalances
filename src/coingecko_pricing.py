@@ -64,8 +64,8 @@ def price_retrievable(web3: Web3, block_start_timestamp: int) -> bool:
     newest_block_timestamp = web3.eth.get_block(get_finalized_block_number(web3))[
         "timestamp"
     ]
-    if (newest_block_timestamp - block_start_timestamp) > COINGECKO_TIME_LIMIT:
-        return True
+    return (newest_block_timestamp - block_start_timestamp) > COINGECKO_TIME_LIMIT
+
 
 
 def get_price(web3: Web3, block_number: int, token_address: str, tx_hash: str):
