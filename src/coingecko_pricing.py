@@ -54,7 +54,7 @@ def fetch_api_price(
         return None
 
 
-def price_retrievable(web3: Web3, block_start_timestamp: int) -> bool:
+def price_not_retrievable(web3: Web3, block_start_timestamp: int) -> bool:
     """
     This function checks if the time elapsed between the latest block and block being processed
     is less than 2 days, which is coingecko's time frame for fetching 5-minutely data.
@@ -74,7 +74,7 @@ def get_price(web3: Web3, block_number: int, token_address: str, tx_hash: str):
     """
 
     block_start_timestamp = web3.eth.get_block(block_number)["timestamp"]
-    if price_retrievable(web3, block_start_timestamp):
+    if price_not_retrievable(web3, block_start_timestamp):
         return None
 
     # Coingecko doesn't store ETH address, which occurs commonly in imbalances.

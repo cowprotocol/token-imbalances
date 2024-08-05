@@ -209,9 +209,6 @@ def process_transactions(chain_name: str) -> None:
     ) = initialize_connections()
     rt = RawTokenImbalances(web3, chain_name)
     start_block = get_start_block(web3, chain_name, solver_slippage_db_connection)
-    ## this is just saying that the start block should be hardcoded in case the script restarts a few hours after that specific block
-    if start_block - 12000 < 20420000:
-        start_block = 20420000
     previous_block = start_block
     unprocessed_txs: List[Tuple[str, int, int]] = []
 
