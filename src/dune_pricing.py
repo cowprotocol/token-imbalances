@@ -1,28 +1,42 @@
-import os
-from typing import Optional
-import requests
-import json
-from web3 import Web3
-from src.config import logger
-from src.helper_functions import get_finalized_block_number
-from src.constants import NATIVE_ETH_TOKEN_ADDRESS, WETH_TOKEN_ADDRESS
+import dotenv, os
+from dune_client.types import QueryParameter
+from dune_client.client import DuneClient
+from dune_client.query import QueryBase
+from src.config import get_web3_instance
 
+dotenv.load_dotenv()
 dune_api_key = os.getenv("DUNE_API_KEY")
+dune = DuneClient.from_env()
 
-def get_dune_price(token_address, start_timestamp, end_timestamp):
-    query = QueryBase(
-        name="ERC20 Prices",
-        query_id=3935228,
-        params=[
-            QueryParameter.text_type(name="token_address", value=token_address),
-            QueryParameter.number_type(name="start_timestamp", value=start_timestamp),
-            QueryParameter.number_type(name="end_timestamp", value=end_timestamp),
-        ],
-    )
-    result = dune.run_query(query=query)
-    for row in result.result.rows:
-        print(row["price"])
+# Query is set to LIMIT 1, i.e. it will return a single price
+fetch_price_query_id = 3935228
 
 
-token_address = "0x00380d12a12acf6f47481E8CA8BE777931395200"
-get_dune_price(token_address.lower(), 1721165100, 1721168700)
+class DunePriceProvider:
+    def __init__(self):
+        self.web3 = get_web3_instance()
+
+    def get_price(self, block_number: int, token_address):
+        # Query uses an end_timestamp to limit results
+        BUFFER_TIME = 100
+        start_timestamp = self.web3.eth.get_block(block_number)["timestamp"]
+        end_timestamp = start_timestamp + BUFFER_TIME
+        query = QueryBase(
+            name="ERC20 Prices",
+            query_id=fetch_price_query_id,
+            params=[
+                QueryParameter.text_type(name="token_address", value=token_address),
+                QueryParameter.number_type(
+                    name="start_timestamp", value=start_timestamp
+                ),
+                QueryParameter.number_type(name="end_timestamp", value=end_timestamp),
+            ],
+        )
+        result = dune.run_query(query=query)
+        if result.result.rows:
+            row = result.result.rows[0]
+            price = row.get("price")
+            if price is not None:
+                return price
+        # No valid price found
+        return None

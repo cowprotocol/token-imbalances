@@ -4,7 +4,7 @@ Running this daemon computes raw imbalances for finalized blocks by calling imba
 
 import os
 import time
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 from web3 import Web3
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
@@ -21,7 +21,9 @@ from src.config import (
     check_db_connection,
     logger,
 )
-from src.coingecko_pricing import get_price
+from src.coingecko_pricing import CoingeckoPriceProvider
+from src.dune_pricing import DunePriceProvider
+from src.moralis_pricing import MoralisPriceProvider
 
 
 def get_start_block(
@@ -165,21 +167,22 @@ def write_token_imbalances_to_db(
         )
 
 
-def write_coingecko_prices(
+def write_prices(
     chain_name: str,
+    source: str,
     solver_slippage_connection: Engine,
     block_number: int,
     tx_hash: bytes,
     token_address: bytes,
-    coingecko_price: float,
+    price: float,
 ) -> None:
     """
-    Write coingecko prices to the table.
+    Write prices to the table.
     """
     solver_slippage_connection = check_db_connection(
         solver_slippage_connection, "solver_slippage"
     )
-    query = read_sql_file("src/sql/insert_coingecko_price.sql")
+    query = read_sql_file("src/sql/insert_price.sql")
 
     try:
         with solver_slippage_connection.connect() as connection:
@@ -187,16 +190,28 @@ def write_coingecko_prices(
                 text(query),
                 {
                     "chain_name": chain_name,
+                    "source": source,
                     "block_number": block_number,
                     "tx_hash": tx_hash,
                     "token_address": token_address,
-                    "coingecko_price": coingecko_price,
+                    "price": price,
                 },
             )
             connection.commit()
             logger.debug("Record inserted successfully into prices table.")
     except Exception as e:
         logger.error("Error inserting record: %s", e)
+
+
+def get_price(PriceProviders: List, block_number, token_address) -> Optional[float]:
+    for provider in PriceProviders:
+        try:
+            price = provider.get_price(block_number, token_address)
+            if price is not None:
+                return price, provider.__class__.__name__
+        except Exception as e:
+            logger.error("Error getting price from provider: %s", e)
+    return None
 
 
 def process_transactions(chain_name: str) -> None:
@@ -208,6 +223,11 @@ def process_transactions(chain_name: str) -> None:
         solver_slippage_db_connection,
     ) = initialize_connections()
     rt = RawTokenImbalances(web3, chain_name)
+    api_prices = [
+        CoingeckoPriceProvider(),
+        DunePriceProvider(),
+        MoralisPriceProvider(),
+    ]
     start_block = get_start_block(web3, chain_name, solver_slippage_db_connection)
     previous_block = start_block
     unprocessed_txs: List[Tuple[str, int, int]] = []
@@ -244,19 +264,19 @@ def process_transactions(chain_name: str) -> None:
                                     token_address_bytes,
                                     imbalance,
                                 )
-                                coingecko_price = get_price(
-                                    web3, block_number, token_address, tx_hash
+                                price, source = get_price(
+                                    api_prices, block_number, token_address
                                 )
-                                if coingecko_price is not None:
-                                    write_coingecko_prices(
+                                if price is not None:
+                                    write_prices(
                                         chain_name,
+                                        source,
                                         solver_slippage_db_connection,
                                         block_number,
                                         tx_hash_bytes,
                                         token_address_bytes,
-                                        coingecko_price,
+                                        price,
                                     )
-
                                 log_message.append(
                                     f"Token: {token_address}, Imbalance: {imbalance}"
                                 )
