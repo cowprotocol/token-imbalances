@@ -41,7 +41,7 @@ class DunePriceProvider:
                     ),
                 ],
             )
-            result = dune.run_query(query=query)
+            result = dune.run_query(query=query)  # type: ignore[attr-defined]
             if result.result.rows:
                 row = result.result.rows[0]
                 price = row.get("price")
