@@ -12,3 +12,4 @@ setuptools
 pandas-stubs
 types-psycopg2
 types-requests
+moralis

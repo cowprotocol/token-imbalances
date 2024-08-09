@@ -6,31 +6,31 @@ import json
 from web3 import Web3
 from src.config import logger, get_web3_instance
 from src.helper_functions import get_finalized_block_number
-from src.constants import NATIVE_ETH_TOKEN_ADDRESS, WETH_TOKEN_ADDRESS
+from src.constants import (
+    NATIVE_ETH_TOKEN_ADDRESS,
+    WETH_TOKEN_ADDRESS,
+    TOKEN_LIST_RELOAD_TIME,
+    COINGECKO_TIME_LIMIT,
+    BUFFER_TIME,
+)
 
 coingecko_api_key = os.getenv("COINGECKO_API_KEY")
 
 
 class CoingeckoPriceProvider:
-    def __init__(self):
+    """
+    Purpose of this class is to fetch historical token prices from Coingecko.
+    """
+
+    def __init__(self) -> None:
         self.web3 = get_web3_instance()
-        self.filtered_token_list = self.load_filtered_token_list()
+        self.filtered_token_list = self.fetch_coingecko_list()
         self.last_reload_time = time.time()  # current time in seconds since epoch
 
-    def load_filtered_token_list(self) -> List[Dict]:
+    def fetch_coingecko_list(self) -> List[Dict]:
         """
-        Load and filter the list of tokens from CoinGecko API.
-        """
-        tokens_data = self.fetch_coingecko_list()
-        tokens_list = json.loads(tokens_data)
-        return self.filter_ethereum_tokens(tokens_list)
-
-    def fetch_coingecko_list(self) -> str:
-        """
-        Fetch the list of tokens from CoinGecko with platform information.
-
-        Returns:
-            str: The raw JSON response from the CoinGecko API.
+        Fetch and filter the list of tokens (currently filters only Ethereum)
+        from the Coingecko API.
         """
         url = (
             f"https://pro-api.coingecko.com/api/v3/coins/"
@@ -38,18 +38,15 @@ class CoingeckoPriceProvider:
         )
         headers = {
             "accept": "application/json",
-            "x-cg-pro-api-key": coingecko_api_key,
         }
-        response = requests.get(url, headers=headers)
-        return response.text
+        if coingecko_api_key:
+            headers["x-cg-pro-api-key"] = coingecko_api_key
 
-    def filter_ethereum_tokens(self, coingecko_tokens_list: List[Dict]) -> List[Dict]:
-        """
-        filter tokens to include only those that are on ethereum.
-        """
+        response = requests.get(url, headers=headers)
+        tokens_list = json.loads(response.text)
         return [
             {"id": item["id"], "platforms": {"ethereum": item["platforms"]["ethereum"]}}
-            for item in coingecko_tokens_list
+            for item in tokens_list
             if "ethereum" in item["platforms"]
         ]
 
@@ -57,14 +54,16 @@ class CoingeckoPriceProvider:
         """check if the token list needs to be reloaded based on time."""
         current_time = time.time()
         elapsed_time = current_time - self.last_reload_time
-        # checks every 24 hours, converted to seconds
-        return elapsed_time >= 86400
+        # checks for set elapsed time (currently 24 hours), in seconds
+        return elapsed_time >= TOKEN_LIST_RELOAD_TIME
 
-    def get_token_id_by_address(self, token_address):
-        """Check to see if an updated token list is required.
-        Get the token ID using token address."""
+    def get_token_id_by_address(self, token_address) -> Optional[str]:
+        """
+        Check to see if an updated token list is required.
+        Get the token ID by searching for the token address.
+        """
         if self.check_reload_token_list():
-            self.filtered_token_list = self.load_filtered_token_list()
+            self.filtered_token_list = self.fetch_coingecko_list()
             self.last_reload_time = (
                 time.time()
             )  # update the last reload time to current time
@@ -109,14 +108,12 @@ class CoingeckoPriceProvider:
         This function checks if the time elapsed between the latest block and block being processed
         is less than 2 days, which is coingecko's time frame for fetching 5-minutely data.
         """
-        # Time in seconds of 45 hours.
-        COINGECKO_TIME_LIMIT = 162000
         newest_block_timestamp = self.web3.eth.get_block(
             get_finalized_block_number(self.web3)
         )["timestamp"]
         return (newest_block_timestamp - block_start_timestamp) > COINGECKO_TIME_LIMIT
 
-    def get_price(self, block_number: int, token_address: str):
+    def get_price(self, block_number: int, token_address: str) -> Optional[float]:
         """
         Function returns coingecko price for a token address,
         closest to and at least as large as the block timestamp for a given tx hash.
@@ -137,13 +134,15 @@ class CoingeckoPriceProvider:
         # We need to provide a sufficient buffer time for fetching 5-minutely prices from coingecko.
         # If too short, it's possible that no price may be returned. We use the first value returned,
         # which would be closest to block timestamp
-        BUFFER_TIME = 600
         block_end_timestamp = block_start_timestamp + BUFFER_TIME
 
+        # Coingecko requires a lowercase token address
         token_address = token_address.lower()
         token_id = self.get_token_id_by_address(token_address)
         if not token_id:
-            logger.warning(f"Token ID not found for the given address: {token_address}")
+            logger.warning(
+                f"Token ID not found for the given address on Coingecko: {token_address}"
+            )
             return None
         try:
             api_price = self.fetch_api_price(

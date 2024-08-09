@@ -21,9 +21,9 @@ from src.config import (
     check_db_connection,
     logger,
 )
-from src.coingecko_pricing import CoingeckoPriceProvider
-from src.dune_pricing import DunePriceProvider
-from src.moralis_pricing import MoralisPriceProvider
+from src.price_providers.coingecko_pricing import CoingeckoPriceProvider
+from src.price_providers.dune_pricing import DunePriceProvider
+from src.price_providers.moralis_pricing import MoralisPriceProvider
 
 
 def get_start_block(
@@ -203,7 +203,9 @@ def write_prices(
         logger.error("Error inserting record: %s", e)
 
 
-def get_price(PriceProviders: List, block_number, token_address) -> Optional[float]:
+def get_price(
+    PriceProviders: List, block_number: int, token_address: str
+) -> Optional[Tuple[float, str]]:
     for provider in PriceProviders:
         try:
             price = provider.get_price(block_number, token_address)
@@ -264,10 +266,11 @@ def process_transactions(chain_name: str) -> None:
                                     token_address_bytes,
                                     imbalance,
                                 )
-                                price, source = get_price(
+                                price_data = get_price(
                                     api_prices, block_number, token_address
                                 )
-                                if price is not None:
+                                if price_data:
+                                    price, source = price_data
                                     write_prices(
                                         chain_name,
                                         source,
