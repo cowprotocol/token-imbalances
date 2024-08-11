@@ -1,8 +1,8 @@
 import os
-from src.config import initialize_connections, logger
+from src.helpers.config import initialize_connections, logger
 from src.transaction_processor import TransactionProcessor
-from src.helper_classes.database import Database
-from src.helper_classes.blockchain_data import BlockchainData
+from src.helpers.database import Database
+from src.helpers.blockchain_data import BlockchainData
 
 
 def main() -> None:

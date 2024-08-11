@@ -5,7 +5,7 @@ and the BalanceOfImbalances class.
 
 import time
 from web3 import Web3
-from src.config import ETHEREUM_NODE_URL
+from src.helpers.config import ETHEREUM_NODE_URL
 from src.imbalances_script import RawTokenImbalances
 from src.balanceof_imbalances import BalanceOfImbalances
 from src.daemon import get_web3_instance, create_db_connection, fetch_transaction_hashes

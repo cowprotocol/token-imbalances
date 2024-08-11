@@ -2,7 +2,7 @@ from typing import Optional, Tuple
 from src.price_providers.coingecko_pricing import CoingeckoPriceProvider
 from src.price_providers.dune_pricing import DunePriceProvider
 from src.price_providers.moralis_pricing import MoralisPriceProvider
-from src.config import logger
+from src.helpers.config import logger
 
 
 class PriceFeed:

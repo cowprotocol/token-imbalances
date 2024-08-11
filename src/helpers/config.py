@@ -5,7 +5,7 @@ from sqlalchemy.exc import OperationalError
 from sqlalchemy import create_engine, Engine
 from dotenv import load_dotenv
 from web3 import Web3
-from src.helper_functions import get_logger, get_web3_instance
+from src.helpers.helper_functions import get_logger, get_web3_instance
 
 
 load_dotenv()

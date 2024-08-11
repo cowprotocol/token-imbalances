@@ -3,7 +3,7 @@ import os
 from dotenv import load_dotenv
 import pytest
 from src.imbalances_script import RawTokenImbalances
-from src.helper_functions import get_web3_instance
+from src.helpers.helper_functions import get_web3_instance
 
 load_dotenv()
 

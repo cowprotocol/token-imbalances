@@ -4,8 +4,8 @@ from typing import Dict, List, Optional
 import requests
 import json
 from web3 import Web3
-from src.config import logger, get_web3_instance
-from src.helper_functions import get_finalized_block_number
+from src.helpers.config import logger, get_web3_instance
+from src.helpers.helper_functions import get_finalized_block_number
 from src.constants import (
     NATIVE_ETH_TOKEN_ADDRESS,
     WETH_TOKEN_ADDRESS,

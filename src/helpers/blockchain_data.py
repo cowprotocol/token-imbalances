@@ -1,6 +1,6 @@
 from web3 import Web3
-from src.helper_functions import get_tx_hashes_blocks, get_auction_id
-from src.config import logger
+from src.helpers.helper_functions import get_tx_hashes_blocks, get_auction_id
+from src.helpers.config import logger
 
 
 class BlockchainData:

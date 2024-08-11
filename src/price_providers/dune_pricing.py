@@ -3,7 +3,7 @@ import dotenv, os
 from dune_client.types import QueryParameter
 from dune_client.client import DuneClient
 from dune_client.query import QueryBase
-from src.config import get_web3_instance, get_logger
+from src.helpers.config import get_web3_instance, get_logger
 from src.constants import FETCH_PRICE_QUERY_ID, QUERY_BUFFER_TIME
 
 dotenv.load_dotenv()

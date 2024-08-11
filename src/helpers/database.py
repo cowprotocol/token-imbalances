@@ -1,6 +1,6 @@
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
-from src.config import check_db_connection, logger
+from src.helpers.config import check_db_connection, logger
 
 
 class Database:

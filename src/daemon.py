@@ -9,13 +9,13 @@ from web3 import Web3
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
 from src.imbalances_script import RawTokenImbalances
-from src.helper_functions import (
+from src.helpers.helper_functions import (
     get_finalized_block_number,
     get_tx_hashes_blocks,
     get_auction_id,
     read_sql_file,
 )
-from src.config import (
+from src.helpers.config import (
     initialize_connections,
     CHAIN_SLEEP_TIME,
     check_db_connection,

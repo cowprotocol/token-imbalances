@@ -1,6 +1,6 @@
 from typing import Optional
 from moralis import evm_api
-from src.config import get_logger
+from src.helpers.config import get_logger
 import os, dotenv
 
 dotenv.load_dotenv()

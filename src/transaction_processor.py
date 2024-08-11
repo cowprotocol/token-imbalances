@@ -1,10 +1,10 @@
 from typing import List, Tuple
-from src.helper_classes.blockchain_data import BlockchainData
-from src.helper_classes.database import Database
+from src.helpers.blockchain_data import BlockchainData
+from src.helpers.database import Database
 from src.imbalances_script import RawTokenImbalances
 from src.price_providers.price_feed import PriceFeed
-from src.helper_functions import read_sql_file
-from src.config import CHAIN_SLEEP_TIME, logger
+from src.helpers.helper_functions import read_sql_file
+from src.helpers.config import CHAIN_SLEEP_TIME, logger
 import time
 
 

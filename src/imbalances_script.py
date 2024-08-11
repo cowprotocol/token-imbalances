@@ -28,7 +28,7 @@ from web3 import Web3
 from web3.datastructures import AttributeDict
 from web3.types import TxReceipt
 
-from src.config import CHAIN_RPC_ENDPOINTS, logger
+from src.helpers.config import CHAIN_RPC_ENDPOINTS, logger
 from src.constants import (
     SETTLEMENT_CONTRACT_ADDRESS,
     NATIVE_ETH_TOKEN_ADDRESS,
