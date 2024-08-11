@@ -60,7 +60,7 @@ def check_db_connection(connection: Engine, db_type: str) -> Engine:
     """
     try:
         if connection:
-            with connection.connect() as conn:  # Use connection.connect() to get a Connection object
+            with connection.connect() as conn:
                 conn.execute(text("SELECT 1"))
     except OperationalError:
         # if connection is closed, create new one
