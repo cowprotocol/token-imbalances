@@ -1,5 +1,7 @@
 requests==2.31.0
 web3>=6.0.0
+typing_extensions==4.12.2
+hexbytes==1.2.1
 pandas==2.2.1
 SQLAlchemy==2.0.28
 psycopg2==2.9.9
