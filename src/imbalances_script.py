@@ -22,12 +22,9 @@ Steps for computing token imbalances:
    transfer involved which has special handling for its events.
 """
 
-from typing import Dict, List, Optional, Tuple
-
 from web3 import Web3
 from web3.datastructures import AttributeDict
 from web3.types import TxReceipt
-
 from src.helpers.config import CHAIN_RPC_ENDPOINTS, logger
 from src.constants import (
     SETTLEMENT_CONTRACT_ADDRESS,
@@ -46,12 +43,12 @@ EVENT_TOPICS = {
 }
 
 
-def compute_event_topics(web3: Web3) -> Dict[str, str]:
+def compute_event_topics(web3: Web3) -> dict[str, str]:
     """Compute the event topics for all relevant events."""
     return {name: web3.keccak(text=text).hex() for name, text in EVENT_TOPICS.items()}
 
 
-def find_chain_with_tx(tx_hash: str) -> Tuple[str, Web3]:
+def find_chain_with_tx(tx_hash: str) -> tuple[str, Web3]:
     """
     Find the chain where the transaction is present.
     Returns the chain name and the web3 instance. Used for checking single tx hashes.
@@ -89,7 +86,7 @@ class RawTokenImbalances:
         self.web3 = web3
         self.chain_name = chain_name
 
-    def get_transaction_receipt(self, tx_hash: str) -> Optional[TxReceipt]:
+    def get_transaction_receipt(self, tx_hash: str) -> TxReceipt | None:
         """
         Get the transaction receipt from the provided web3 instance.
         """
@@ -99,7 +96,7 @@ class RawTokenImbalances:
             logger.error("Error getting transaction receipt: %s", ex)
             return None
 
-    def get_transaction_trace(self, tx_hash: str) -> Optional[List[Dict]]:
+    def get_transaction_trace(self, tx_hash: str) -> list[dict] | None:
         """Function used for retreiving trace to identify native ETH transfers."""
         try:
             res = self.web3.tracing.trace_transaction(tx_hash)
@@ -108,7 +105,7 @@ class RawTokenImbalances:
             logger.error("Error occurred while fetching transaction trace: %s", err)
             return None
 
-    def extract_actions(self, traces: List[AttributeDict], address: str) -> List[Dict]:
+    def extract_actions(self, traces: list[AttributeDict], address: str) -> list[dict]:
         """Identify transfer events in trace involving the specified contract."""
         normalized_address = Web3.to_checksum_address(address)
         actions = []
@@ -124,7 +121,7 @@ class RawTokenImbalances:
                     actions.append(dict(action))
         return actions
 
-    def calculate_native_eth_imbalance(self, actions: List[Dict], address: str) -> int:
+    def calculate_native_eth_imbalance(self, actions: list[dict], address: str) -> int:
         """Extract ETH imbalance from transfer actions."""
         # inflow is the total value transferred to address param
         inflow = sum(
@@ -140,7 +137,7 @@ class RawTokenImbalances:
         )
         return inflow - outflow
 
-    def extract_events(self, tx_receipt: Dict) -> Dict[str, List[Dict]]:
+    def extract_events(self, tx_receipt: dict) -> dict[str, list[dict]]:
         """Extract relevant events from the transaction receipt."""
         event_topics = compute_event_topics(self.web3)
         # transfer_topics are filtered to find imbalances for most ERC-20 tokens
@@ -152,7 +149,7 @@ class RawTokenImbalances:
             k: v for k, v in event_topics.items() if k not in transfer_topics
         }
 
-        events: Dict[str, List[Dict]] = {name: [] for name in EVENT_TOPICS}
+        events: dict[str, list[dict]] = {name: [] for name in EVENT_TOPICS}
         for log in tx_receipt["logs"]:
             log_topic = log["topics"][0].hex()
             if log_topic in transfer_topics.values():
@@ -164,9 +161,7 @@ class RawTokenImbalances:
                         break
         return events
 
-    def decode_event(
-        self, event: Dict
-    ) -> Tuple[Optional[str], Optional[str], Optional[int]]:
+    def decode_event(self, event: dict) -> tuple[str | None, str | None, int | None]:
         """
         Decode transfer and withdrawal events.
         Returns from_address, to_address (for transfer), and value.
@@ -195,9 +190,9 @@ class RawTokenImbalances:
 
     def process_event(
         self,
-        event: Dict,
-        inflows: Dict[str, int],
-        outflows: Dict[str, int],
+        event: dict,
+        inflows: dict[str, int],
+        outflows: dict[str, int],
         address: str,
     ) -> None:
         """Process a single event to update inflows and outflows."""
@@ -214,8 +209,8 @@ class RawTokenImbalances:
             outflows[event["address"]] = outflows.get(event["address"], 0) + value
 
     def calculate_imbalances(
-        self, events: Dict[str, List[Dict]], address: str
-    ) -> Dict[str, int]:
+        self, events: dict[str, list[dict]], address: str
+    ) -> dict[str, int]:
         """Calculate token imbalances from events."""
         inflows, outflows = {}, {}  # type: (dict, dict)
         for event in events["Transfer"]:
@@ -230,8 +225,8 @@ class RawTokenImbalances:
 
     def update_weth_imbalance(
         self,
-        events: Dict[str, List[Dict]],
-        imbalances: Dict[str, int],
+        events: dict[str, list[dict]],
+        imbalances: dict[str, int],
         address: str,
     ) -> None:
         """Update the WETH imbalance in imbalances."""
@@ -246,13 +241,13 @@ class RawTokenImbalances:
         imbalances[WETH_TOKEN_ADDRESS] = weth_imbalance
 
     def update_native_eth_imbalance(
-        self, imbalances: Dict[str, int], native_eth_imbalance: Optional[int]
+        self, imbalances: dict[str, int], native_eth_imbalance: int | None
     ) -> None:
         """Update the native ETH imbalance in imbalances."""
         if native_eth_imbalance is not None:
             imbalances[NATIVE_ETH_TOKEN_ADDRESS] = native_eth_imbalance
 
-    def decode_sdai_event(self, event: Dict) -> int | None:
+    def decode_sdai_event(self, event: dict) -> int | None:
         """Decode sDAI event."""
         try:
             # SDAI event has hex value at the end, which needs to be extracted
@@ -267,7 +262,7 @@ class RawTokenImbalances:
             return None
 
     def process_sdai_event(
-        self, event: Dict, imbalances: Dict[str, int], is_deposit: bool
+        self, event: dict, imbalances: dict[str, int], is_deposit: bool
     ) -> None:
         """Process an sDAI deposit or withdrawal event to update imbalances."""
         decoded_event_value = self.decode_sdai_event(event)
@@ -283,11 +278,11 @@ class RawTokenImbalances:
             )
 
     def update_sdai_imbalance(
-        self, events: Dict[str, List[Dict]], imbalances: Dict[str, int]
+        self, events: dict[str, list[dict]], imbalances: dict[str, int]
     ) -> None:
         """Update the sDAI imbalance in imbalances."""
 
-        def filter_sdai_events(event_list: List[Dict], is_deposit: bool) -> None:
+        def filter_sdai_events(event_list: list[dict], is_deposit: bool) -> None:
             for event in event_list:
                 if event["address"] == SDAI_TOKEN_ADDRESS:
                     for topic in event["topics"]:
@@ -301,20 +296,17 @@ class RawTokenImbalances:
         filter_sdai_events(events["DepositSDAI"], is_deposit=True)
         filter_sdai_events(events["WithdrawSDAI"], is_deposit=False)
 
-    def compute_imbalances(self, tx_hash: str) -> Optional[Dict[str, int]]:
+    def compute_imbalances(self, tx_hash: str) -> dict[str, int]:
         try:
             tx_receipt = self.get_transaction_receipt(tx_hash)
             if not tx_receipt:
-                logger.error("No transaction receipt found for %s", tx_hash)
-                return None
+                raise ValueError(f"No transaction receipt found for {tx_hash}")
 
             traces = self.get_transaction_trace(tx_hash)
             if traces is None:
-                logger.error(
-                    "Error fetching transaction trace for %s. Marking transaction as unprocessed.",
-                    tx_hash,
+                raise ValueError(
+                    f"Error fetching transaction trace for {tx_hash}. Marking transaction as unprocessed."
                 )
-                return None
 
             events = self.extract_events(tx_receipt)
             imbalances = self.calculate_imbalances(events, SETTLEMENT_CONTRACT_ADDRESS)
@@ -337,7 +329,7 @@ class RawTokenImbalances:
 
         except Exception as e:
             logger.error("Error computing imbalances for %s: %s", tx_hash, e)
-            return None
+            raise
 
 
 def main() -> None:
@@ -347,13 +339,15 @@ def main() -> None:
     rt = RawTokenImbalances(web3, chain_name)
     try:
         imbalances = rt.compute_imbalances(tx_hash)
-        if imbalances is not None:
+        if imbalances:
             logger.info(f"Token Imbalances on {chain_name}:")
             for token_address, imbalance in imbalances.items():
                 logger.info(f"Token: {token_address}, Imbalance: {imbalance}")
         else:
-            raise ValueError("Imbalances computation returned None.")
-    except ValueError as e:
+            logger.info(
+                f"No imbalances found for transaction {tx_hash} on {chain_name}."
+            )
+    except Exception as e:
         logger.error(e)
 
 

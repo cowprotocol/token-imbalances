@@ -1,12 +1,13 @@
-from typing import Optional
 from moralis import evm_api
 from src.helpers.config import get_logger
 import os, dotenv
+from src.price_providers.pricing_model import AbstractPriceProvider
+
 
 dotenv.load_dotenv()
 
 
-class MoralisPriceProvider:
+class MoralisPriceProvider(AbstractPriceProvider):
     """
     Purpose of this class is to fetch historical token prices using the Moralis API.
     """
@@ -14,15 +15,19 @@ class MoralisPriceProvider:
     def __init__(self) -> None:
         self.logger = get_logger()
 
+    @property
+    def name(self) -> str:
+        return "Moralis"
+
     @staticmethod
-    def wei_to_eth(price: str) -> Optional[float]:
+    def wei_to_eth(price: str) -> float | None:
         """Function to convert string price to float price in ETH."""
         float_price = float(price) if isinstance(price, str) else None
         if isinstance(float_price, float):
             return float_price / 10**18
         return None
 
-    def get_price(self, block_number: int, token_address: str) -> Optional[float]:
+    def get_price(self, block_number: int, token_address: str) -> float | None:
         """
         Function returns Moralis price given a block number and token_address.
         Price returned is closest to and at least as large as block timestamp.

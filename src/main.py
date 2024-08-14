@@ -6,6 +6,7 @@ from src.helpers.blockchain_data import BlockchainData
 
 
 def main() -> None:
+    # valid chain names: mainnet, xdai, arbitrum-one
     chain_name = os.getenv("CHAIN_NAME")
     if chain_name is None:
         logger.error("CHAIN_NAME environment variable is not set.")
@@ -13,7 +14,7 @@ def main() -> None:
 
     web3, db_engine = initialize_connections()
     blockchain = BlockchainData(web3)
-    db = Database(db_engine)
+    db = Database(db_engine, chain_name)
     processor = TransactionProcessor(blockchain, db, chain_name)
 
     start_block = processor.get_start_block()

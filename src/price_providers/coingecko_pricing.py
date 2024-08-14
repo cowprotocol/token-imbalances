@@ -1,23 +1,23 @@
 import os
 import time
-from typing import Dict, List, Optional
 import requests
 import json
 from web3 import Web3
+from src.price_providers.pricing_model import AbstractPriceProvider
 from src.helpers.config import logger, get_web3_instance
 from src.helpers.helper_functions import get_finalized_block_number
 from src.constants import (
     NATIVE_ETH_TOKEN_ADDRESS,
     WETH_TOKEN_ADDRESS,
-    TOKEN_LIST_RELOAD_TIME,
+    COINGECKO_TOKEN_LIST_RELOAD_TIME,
     COINGECKO_TIME_LIMIT,
-    BUFFER_TIME,
+    COINGECKO_BUFFER_TIME,
 )
 
 coingecko_api_key = os.getenv("COINGECKO_API_KEY")
 
 
-class CoingeckoPriceProvider:
+class CoingeckoPriceProvider(AbstractPriceProvider):
     """
     Purpose of this class is to fetch historical token prices from Coingecko.
     """
@@ -27,7 +27,11 @@ class CoingeckoPriceProvider:
         self.filtered_token_list = self.fetch_coingecko_list()
         self.last_reload_time = time.time()  # current time in seconds since epoch
 
-    def fetch_coingecko_list(self) -> List[Dict]:
+    @property
+    def name(self) -> str:
+        return "Coingecko"
+
+    def fetch_coingecko_list(self) -> list[dict]:
         """
         Fetch and filter the list of tokens (currently filters only Ethereum)
         from the Coingecko API.
@@ -55,9 +59,9 @@ class CoingeckoPriceProvider:
         current_time = time.time()
         elapsed_time = current_time - self.last_reload_time
         # checks for set elapsed time (currently 24 hours), in seconds
-        return elapsed_time >= TOKEN_LIST_RELOAD_TIME
+        return elapsed_time >= COINGECKO_TOKEN_LIST_RELOAD_TIME
 
-    def get_token_id_by_address(self, token_address) -> Optional[str]:
+    def get_token_id_by_address(self, token_address: str) -> str | None:
         """
         Check to see if an updated token list is required.
         Get the token ID by searching for the token address.
@@ -74,7 +78,7 @@ class CoingeckoPriceProvider:
 
     def fetch_api_price(
         self, token_id: str, start_timestamp: int, end_timestamp: int
-    ) -> Optional[float]:
+    ) -> float | None:
         """
         Makes call to Coingecko API to fetch price, between a start and end timestamp.
         """
@@ -113,7 +117,7 @@ class CoingeckoPriceProvider:
         )["timestamp"]
         return (newest_block_timestamp - block_start_timestamp) > COINGECKO_TIME_LIMIT
 
-    def get_price(self, block_number: int, token_address: str) -> Optional[float]:
+    def get_price(self, block_number: int, token_address: str) -> float | None:
         """
         Function returns coingecko price for a token address,
         closest to and at least as large as the block timestamp for a given tx hash.
@@ -134,7 +138,7 @@ class CoingeckoPriceProvider:
         # We need to provide a sufficient buffer time for fetching 5-minutely prices from coingecko.
         # If too short, it's possible that no price may be returned. We use the first value returned,
         # which would be closest to block timestamp
-        block_end_timestamp = block_start_timestamp + BUFFER_TIME
+        block_end_timestamp = block_start_timestamp + COINGECKO_BUFFER_TIME
 
         # Coingecko requires a lowercase token address
         token_address = token_address.lower()

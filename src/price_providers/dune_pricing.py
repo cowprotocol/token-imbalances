@@ -1,17 +1,17 @@
-from typing import Optional
 import dotenv, os
+from src.price_providers.pricing_model import AbstractPriceProvider
 from dune_client.types import QueryParameter
 from dune_client.client import DuneClient
 from dune_client.query import QueryBase
 from src.helpers.config import get_web3_instance, get_logger
-from src.constants import FETCH_PRICE_QUERY_ID, QUERY_BUFFER_TIME
+from src.constants import DUNE_PRICE_QUERY_ID, DUNE_QUERY_BUFFER_TIME
 
 dotenv.load_dotenv()
 dune_api_key = os.getenv("DUNE_API_KEY")
 dune = DuneClient.from_env()
 
 
-class DunePriceProvider:
+class DunePriceProvider(AbstractPriceProvider):
     """
     Purpose of this class is to fetch historical token prices from Dune.
     """
@@ -20,17 +20,25 @@ class DunePriceProvider:
         self.web3 = get_web3_instance()
         self.logger = get_logger()
 
-    def get_price(self, block_number: int, token_address: str) -> Optional[float]:
+    @property
+    def name(self) -> str:
+        return "Dune"
+
+    def get_price(self, block_number: int, token_address: str) -> float | None:
         """
         Function returns Dune price for a token address,
         closest to and at least as large as the block timestamp for a given tx hash.
         """
         try:
-            start_timestamp = self.web3.eth.get_block(block_number)["timestamp"]
-            end_timestamp = start_timestamp + QUERY_BUFFER_TIME
+            start_timestamp = getattr(
+                self.web3.eth.get_block(block_number), "timestamp", None
+            )
+            if start_timestamp is None:
+                raise KeyError("Timestamp not found in block data.")
+            end_timestamp = start_timestamp + DUNE_QUERY_BUFFER_TIME
             query = QueryBase(
                 name="ERC20 Prices",
-                query_id=FETCH_PRICE_QUERY_ID,
+                query_id=DUNE_PRICE_QUERY_ID,
                 params=[
                     QueryParameter.text_type(name="token_address", value=token_address),
                     QueryParameter.number_type(

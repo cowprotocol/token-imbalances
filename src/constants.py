@@ -15,16 +15,16 @@ SDAI_TOKEN_ADDRESS = Web3.to_checksum_address(
 )
 
 # Time limit after which Coingecko Token List is re-fetched (in seconds)
-TOKEN_LIST_RELOAD_TIME = 86400
+COINGECKO_TOKEN_LIST_RELOAD_TIME = 86400
 
-# Time in seconds of 45 hours
+# Time in seconds of 45 hours. Time limit after which 5-minute prices become unavailable.
 COINGECKO_TIME_LIMIT = 162000
 
 # Buffer time interval to allow 5-minutely Coingecko prices to be fetched
-BUFFER_TIME = 600
+COINGECKO_BUFFER_TIME = 600
 
 # Dune query for fetching prices is set to LIMIT 1, i.e. it will return a single price
-FETCH_PRICE_QUERY_ID = 3935228
+DUNE_PRICE_QUERY_ID = 3935228
 
 # Dune Query 3935228 uses an end_timestamp to limit results
-QUERY_BUFFER_TIME = 100
+DUNE_QUERY_BUFFER_TIME = 100

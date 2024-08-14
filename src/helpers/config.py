@@ -54,18 +54,18 @@ def create_db_connection(db_type: str) -> Engine:
     return create_engine(f"postgresql+psycopg2://{db_url}")
 
 
-def check_db_connection(connection: Engine, db_type: str) -> Engine:
+def check_db_connection(engine: Engine, db_type: str) -> Engine:
     """
-    Check if the database connection is still active. If not, create a new one.
+    Check if the database engine is still active. If not, create a new one.
     """
     try:
-        if connection:
-            with connection.connect() as conn:
+        if engine:
+            with engine.connect() as conn:
                 conn.execute(text("SELECT 1"))
     except OperationalError:
-        # if connection is closed, create new one
-        connection = create_db_connection(db_type)
-    return connection
+        # if engine is closed (failed query execution above), create new one
+        engine = create_db_connection(db_type)
+    return engine
 
 
 def initialize_connections() -> Tuple[Web3, Engine]:
