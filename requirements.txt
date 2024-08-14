@@ -4,8 +4,8 @@ pandas==2.2.1
 SQLAlchemy==2.0.28
 psycopg2==2.9.9
 python-dotenv==1.0.0
-moralis==0.1.48
 dune-client==1.7.4
+moralis
 black
 mypy
 pylint
@@ -14,4 +14,3 @@ setuptools
 pandas-stubs
 types-psycopg2
 types-requests
-typing-extensions>=4.3.0
