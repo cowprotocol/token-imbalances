@@ -14,3 +14,4 @@ setuptools
 pandas-stubs
 types-psycopg2
 types-requests
+typing-extensions>=4.3.0
