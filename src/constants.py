@@ -14,6 +14,8 @@ SDAI_TOKEN_ADDRESS = Web3.to_checksum_address(
     "0x83F20F44975D03b1b09e64809B757c47f942BEeA"
 )
 
+REQUEST_TIMEOUT = 5
+
 # Time limit after which Coingecko Token List is re-fetched (in seconds)
 COINGECKO_TOKEN_LIST_RELOAD_TIME = 86400
 
