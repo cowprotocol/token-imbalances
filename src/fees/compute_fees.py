@@ -385,17 +385,17 @@ class OrderbookAWSFetcher:
 
     def __init__(self) -> None:
         load_dotenv()
-        network = os.getenv("NETWORK")
+        chain_name = os.getenv("CHAIN_NAME")
 
         self.orderbook_urls = {
-            "prod": f"https://api.cow.fi/{network}/api/v1/",
-            "barn": f"https://barn.api.cow.fi/{network}/api/v1/",
+            "prod": f"https://api.cow.fi/{chain_name}/api/v1/",
+            "barn": f"https://barn.api.cow.fi/{chain_name}/api/v1/",
         }
         self.aws_urls = {
             "prod": "https://solver-instances.s3.eu-central-1.amazonaws.com/"
-            f"prod/{network}/autopilot/",
+            f"prod/{chain_name}/autopilot/",
             "barn": "https://solver-instances.s3.eu-central-1.amazonaws.com/"
-            f"staging/{network}/autopilot/",
+            f"staging/{chain_name}/autopilot/",
         }
 
     def get_offchain_data(
