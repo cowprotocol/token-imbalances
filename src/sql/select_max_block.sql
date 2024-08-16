@@ -2,7 +2,7 @@ SELECT
     MIN(max_block_number) AS min_max_block_number
 FROM (
     SELECT MAX(block_number) AS max_block_number 
-    FROM raw_token_imbalances
+    FROM raw_token_imbalances_temp
     WHERE chain_name = :chain_name
     UNION ALL
     SELECT MAX(block_number) AS max_block_number 

@@ -4,6 +4,7 @@ from dune_client.types import QueryParameter
 from dune_client.client import DuneClient
 from dune_client.query import QueryBase
 from src.helpers.config import get_web3_instance, get_logger
+from src.helpers.helper_functions import extract_params
 from src.constants import DUNE_PRICE_QUERY_ID, DUNE_QUERY_BUFFER_TIME
 
 dotenv.load_dotenv()
@@ -24,12 +25,13 @@ class DunePriceProvider(AbstractPriceProvider):
     def name(self) -> str:
         return "Dune"
 
-    def get_price(self, block_number: int, token_address: str) -> float | None:
+    def get_price(self, price_params) -> float | None:
         """
         Function returns Dune price for a token address,
         closest to and at least as large as the block timestamp for a given tx hash.
         """
         try:
+            token_address, block_number = extract_params(price_params, is_block=True)
             start_timestamp = getattr(
                 self.web3.eth.get_block(block_number), "timestamp", None
             )

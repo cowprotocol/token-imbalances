@@ -57,10 +57,10 @@ class TransactionProcessor:
         while True:
             try:
                 latest_block = self.blockchain_data.get_latest_block()
-                print(previous_block, latest_block)
-                new_txs = self.blockchain_data.fetch_tx_data(
-                    previous_block, latest_block
-                )
+                # new_txs = self.blockchain_data.fetch_tx_data(
+                #     previous_block, latest_block
+                # )
+                new_txs = self.blockchain_data.fetch_tx_data(20537440, 20537940)
                 all_txs = new_txs + unprocessed_txs
                 unprocessed_txs.clear()
 
@@ -102,7 +102,13 @@ class TransactionProcessor:
         for token_address in token_imbalances.keys():
             # fetch price for tokens with non-zero imbalance and write to table
             if token_imbalances[token_address] != 0:
-                price_data = self.price_providers.get_price(block_number, token_address)
+                price_params = {
+                    "tx_hash": tx_hash,
+                    "block_number": block_number,
+                    "token_address": token_address,
+                }
+                price_data = self.price_providers.get_price(price_params)
+                # price_data = self.price_providers.get_price(block_number, token_address)
                 if price_data:
                     price, source = price_data
                     self.db.write_prices(

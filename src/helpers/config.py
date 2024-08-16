@@ -11,7 +11,7 @@ from src.helpers.helper_functions import get_logger, get_web3_instance
 load_dotenv()
 NODE_URL = os.getenv("NODE_URL")
 
-logger = get_logger("raw_token_imbalances")
+logger = get_logger("slippage_project")
 
 # Utilized by imbalances_script for computing for single tx hash
 CHAIN_RPC_ENDPOINTS = {

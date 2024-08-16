@@ -70,3 +70,10 @@ def read_sql_file(file_path: str) -> str:
     """This function reads a file (SQL) and returns its content as a string."""
     with open(file_path, "r") as file:
         return file.read()
+
+
+def extract_params(price_params: dict, is_block: bool):
+    """Extract relevant parameters for fetching price from provider."""
+    if is_block:
+        return price_params.get("token_address"), price_params.get("block_number")
+    return price_params.get("token_address"), price_params.get("tx_hash")

@@ -1,6 +1,6 @@
 BEGIN;
 
-DELETE FROM raw_token_imbalances
+DELETE FROM raw_token_imbalances_temp
 WHERE chain_name = :chain_name 
 AND block_number >= :block_number;
 

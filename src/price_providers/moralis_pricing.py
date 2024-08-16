@@ -2,6 +2,7 @@ from moralis import evm_api
 from src.helpers.config import get_logger
 import os, dotenv
 from src.price_providers.pricing_model import AbstractPriceProvider
+from src.helpers.helper_functions import extract_params
 
 
 dotenv.load_dotenv()
@@ -27,12 +28,13 @@ class MoralisPriceProvider(AbstractPriceProvider):
             return float_price / 10**18
         return None
 
-    def get_price(self, block_number: int, token_address: str) -> float | None:
+    def get_price(self, price_params: dict) -> float | None:
         """
         Function returns Moralis price given a block number and token_address.
         Price returned is closest to and at least as large as block timestamp.
         """
         try:
+            token_address, block_number = extract_params(price_params, is_block=True)
             params = {
                 "chain": "eth",
                 "address": token_address,
@@ -51,6 +53,6 @@ class MoralisPriceProvider(AbstractPriceProvider):
             self.logger.warning(f"Error: {e}")
         except Exception as e:
             self.logger.warning(
-                f"Error: Likely the token: {token_address} was not found."
+                f"Error: {e}, Likely the token: {token_address} was not found or API limit reached."
             )
         return None
