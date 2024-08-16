@@ -25,7 +25,7 @@ class DunePriceProvider(AbstractPriceProvider):
     def name(self) -> str:
         return "Dune"
 
-    def get_price(self, price_params) -> float | None:
+    def get_price(self, price_params: dict) -> float | None:
         """
         Function returns Dune price for a token address,
         closest to and at least as large as the block timestamp for a given tx hash.

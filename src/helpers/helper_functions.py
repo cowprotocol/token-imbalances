@@ -7,6 +7,7 @@ import os
 import logging
 from dotenv import load_dotenv
 from web3 import Web3
+from contracts.erc20_abi import erc20_abi
 
 load_dotenv()
 NODE_URL = os.getenv("NODE_URL")
@@ -77,3 +78,21 @@ def extract_params(price_params: dict, is_block: bool):
     if is_block:
         return price_params.get("token_address"), price_params.get("block_number")
     return price_params.get("token_address"), price_params.get("tx_hash")
+
+
+def set_params(token_address: str, block_number: int, tx_hash: str):
+    """Build dictionary for price fetching using params."""
+    return {
+        "tx_hash": tx_hash,
+        "block_number": block_number,
+        "token_address": token_address,
+    }
+
+
+def get_token_decimals(token_address: str) -> int:
+    """Get number of decimals for a token."""
+    web3 = get_web3_instance()
+    contract = web3.eth.contract(
+        address=Web3.to_checksum_address(token_address), abi=erc20_abi
+    )
+    return contract.functions.decimals().call()
