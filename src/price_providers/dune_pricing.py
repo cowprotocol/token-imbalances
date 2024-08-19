@@ -1,3 +1,4 @@
+from typing import cast
 import dotenv, os
 from src.price_providers.pricing_model import AbstractPriceProvider
 from dune_client.types import QueryParameter
@@ -32,7 +33,7 @@ class DunePriceProvider(AbstractPriceProvider):
         if not dune_api_key:
             self.logger.warning("DUNE_API_KEY is not set.")
             return None
-        return DuneClient.from_env()
+        return cast(DuneClient, DuneClient.from_env())
 
     def get_price(self, price_params: dict) -> float | None:
         """
@@ -63,7 +64,7 @@ class DunePriceProvider(AbstractPriceProvider):
                 ],
             )
             result = self.dune.run_query(query=query)  # type: ignore[attr-defined]
-            if result.result.rows:
+            if result and result.result and result.result.rows:
                 row = result.result.rows[0]
                 price = row.get("price")
                 if price is not None:
