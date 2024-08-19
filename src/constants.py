@@ -26,6 +26,6 @@ COINGECKO_BUFFER_TIME = 600
 # Dune query for fetching prices is set to LIMIT 1, i.e. it will return a single price
 DUNE_PRICE_QUERY_ID = 3935228
 
-# Dune Query 3935228 uses an end_timestamp to limit results 
+# Dune Query 3935228 uses an end_timestamp to limit results
 # (Buffer time to return results between start_timstamp and end_timestamp only)
 DUNE_QUERY_BUFFER_TIME = 100

@@ -5,7 +5,8 @@ from src.constants import SETTLEMENT_CONTRACT_ADDRESS
 
 
 class BlockchainData:
-    """ Class provides functions for fetching blockchain data. """
+    """Class provides functions for fetching blockchain data."""
+
     def __init__(self, web3: Web3):
         self.web3 = web3
 

@@ -41,7 +41,7 @@ class MoralisPriceProvider(AbstractPriceProvider):
                 "to_block": block_number,
             }
             result = evm_api.token.get_token_price(
-                api_key=os.getenv("MORALIS_KEY"),
+                api_key=os.getenv("MORALIS_API_KEY"),
                 params=params,
             )
             if "nativePrice" in result and "value" in result["nativePrice"]:

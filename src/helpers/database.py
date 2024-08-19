@@ -5,10 +5,11 @@ from src.helpers.helper_functions import read_sql_file
 
 
 class Database:
-    """ 
+    """
     Class is used to write data to appropriate tables for the slippage project
     using a database connection.
     """
+
     def __init__(self, engine: Engine, chain_name: str):
         self.engine = engine
         self.chain_name = chain_name
