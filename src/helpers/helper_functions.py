@@ -5,17 +5,15 @@ from __future__ import annotations
 import sys
 import os
 import logging
-from typing import List, Optional, Tuple
 from dotenv import load_dotenv
-from hexbytes import HexBytes
 from web3 import Web3
-from src.constants import SETTLEMENT_CONTRACT_ADDRESS
+from contracts.erc20_abi import erc20_abi
 
 load_dotenv()
 NODE_URL = os.getenv("NODE_URL")
 
 
-def get_logger(filename: Optional[str] = None) -> logging.Logger:
+def get_logger(filename: str | None = None) -> logging.Logger:
     """
     get_logger() returns a logger object that can write to a file, terminal or only file if needed.
     """
@@ -69,39 +67,32 @@ def get_finalized_block_number(web3: Web3) -> int:
     return web3.eth.block_number - 67
 
 
-def get_tx_hashes_blocks(
-    web3: Web3, start_block: int, end_block: int
-) -> List[Tuple[str, int]]:
-    """
-    Get all transaction hashes appended with corresponding block (tuple) transactions
-    involving the settlement contract.
-    """
-    tx_hashes_blocks = []
-
-    for block_number in range(start_block, end_block + 1):
-        block = web3.eth.get_block(block_number, full_transactions=True)
-        for tx in block.transactions:  # type: ignore[attr-defined]
-            if tx.to and tx.to.lower() == SETTLEMENT_CONTRACT_ADDRESS.lower():
-                tx_hashes_blocks.append((tx.hash.hex(), block_number))
-    return tx_hashes_blocks
-
-
-def get_auction_id(web3: Web3, tx_hash: str) -> int:
-    """
-    Method that finds an auction id given a transaction hash.
-    """
-    transaction = web3.eth.get_transaction(HexBytes(tx_hash))
-    call_data = transaction["input"]
-    # convert call_data to hexString if it's in hexBytes
-    call_data_bytes = bytes.fromhex(
-        call_data.hex()[2:] if isinstance(call_data, HexBytes) else call_data[2:]
-    )
-    # convert bytes to int
-    auction_id = int.from_bytes(call_data_bytes[-8:], byteorder="big")
-    return auction_id
-
-
 def read_sql_file(file_path: str) -> str:
     """This function reads a file (SQL) and returns its content as a string."""
     with open(file_path, "r") as file:
         return file.read()
+
+
+def extract_params(price_params: dict, is_block: bool):
+    """Extract relevant parameters for fetching price from provider."""
+    if is_block:
+        return price_params.get("token_address"), price_params.get("block_number")
+    return price_params.get("token_address"), price_params.get("tx_hash")
+
+
+def set_params(token_address: str, block_number: int, tx_hash: str):
+    """Build dictionary for price fetching using params."""
+    return {
+        "tx_hash": tx_hash,
+        "block_number": block_number,
+        "token_address": token_address,
+    }
+
+
+def get_token_decimals(token_address: str) -> int:
+    """Get number of decimals for a token."""
+    web3 = get_web3_instance()
+    contract = web3.eth.contract(
+        address=Web3.to_checksum_address(token_address), abi=erc20_abi
+    )
+    return contract.functions.decimals().call()

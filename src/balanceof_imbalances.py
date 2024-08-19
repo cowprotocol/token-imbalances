@@ -2,7 +2,7 @@ from web3 import Web3
 from web3.types import TxReceipt, HexStr
 from eth_typing import ChecksumAddress
 from typing import Dict, Optional, Set
-from src.config import NODE_URL
+from src.helpers.config import NODE_URL
 from src.constants import SETTLEMENT_CONTRACT_ADDRESS, NATIVE_ETH_TOKEN_ADDRESS
 from contracts.erc20_abi import erc20_abi
 

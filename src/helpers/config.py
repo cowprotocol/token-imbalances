@@ -5,13 +5,13 @@ from sqlalchemy.exc import OperationalError
 from sqlalchemy import create_engine, Engine
 from dotenv import load_dotenv
 from web3 import Web3
-from src.helper_functions import get_logger, get_web3_instance
+from src.helpers.helper_functions import get_logger, get_web3_instance
 
 
 load_dotenv()
 NODE_URL = os.getenv("NODE_URL")
 
-logger = get_logger("raw_token_imbalances")
+logger = get_logger("slippage_project")
 
 # Utilized by imbalances_script for computing for single tx hash
 CHAIN_RPC_ENDPOINTS = {
@@ -54,18 +54,18 @@ def create_db_connection(db_type: str) -> Engine:
     return create_engine(f"postgresql+psycopg2://{db_url}")
 
 
-def check_db_connection(connection: Engine, db_type: str) -> Engine:
+def check_db_connection(engine: Engine, db_type: str) -> Engine:
     """
-    Check if the database connection is still active. If not, create a new one.
+    Check if the database engine is still active. If not, create a new one.
     """
     try:
-        if connection:
-            with connection.connect() as conn:  # Use connection.connect() to get a Connection object
+        if engine:
+            with engine.connect() as conn:
                 conn.execute(text("SELECT 1"))
     except OperationalError:
-        # if connection is closed, create new one
-        connection = create_db_connection(db_type)
-    return connection
+        # if engine is closed (failed query execution above), create new one
+        engine = create_db_connection(db_type)
+    return engine
 
 
 def initialize_connections() -> Tuple[Web3, Engine]:
