@@ -4,7 +4,7 @@ from src.helpers.blockchain_data import BlockchainData
 from src.helpers.database import Database
 from src.imbalances_script import RawTokenImbalances
 from src.price_providers.price_feed import PriceFeed
-from src.helpers.helper_functions import read_sql_file
+from src.helpers.helper_functions import read_sql_file, set_params
 from src.helpers.config import CHAIN_SLEEP_TIME, logger
 from src.fees.compute_fees import batch_fee_imbalances
 import time
@@ -60,7 +60,6 @@ class TransactionProcessor:
         while True:
             try:
                 latest_block = self.blockchain_data.get_latest_block()
-                print(previous_block, latest_block)
                 new_txs = self.blockchain_data.fetch_tx_data(
                     previous_block, latest_block
                 )
@@ -110,7 +109,9 @@ class TransactionProcessor:
         for token_address in slippage.keys():
             # fetch price for tokens with non-zero imbalance and write to table
             if slippage[token_address] != 0:
-                price_data = self.price_providers.get_price(block_number, token_address)
+                price_data = self.price_providers.get_price(
+                    set_params(token_address, block_number, tx_hash)
+                )
                 if price_data:
                     price, source = price_data
                     self.db.write_prices(

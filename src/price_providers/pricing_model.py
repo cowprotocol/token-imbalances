@@ -7,7 +7,7 @@ class AbstractPriceProvider(ABC):
     """
 
     @abstractmethod
-    def get_price(self, block_number: int, token_address: str) -> float | None:
+    def get_price(self, price_params: dict) -> float | None:
         """gets the price of a token."""
         pass
 

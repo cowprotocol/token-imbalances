@@ -5,7 +5,7 @@ import json
 from web3 import Web3
 from src.price_providers.pricing_model import AbstractPriceProvider
 from src.helpers.config import logger, get_web3_instance
-from src.helpers.helper_functions import get_finalized_block_number
+from src.helpers.helper_functions import get_finalized_block_number, extract_params
 from src.constants import (
     NATIVE_ETH_TOKEN_ADDRESS,
     WETH_TOKEN_ADDRESS,
@@ -117,12 +117,12 @@ class CoingeckoPriceProvider(AbstractPriceProvider):
         )["timestamp"]
         return (newest_block_timestamp - block_start_timestamp) > COINGECKO_TIME_LIMIT
 
-    def get_price(self, block_number: int, token_address: str) -> float | None:
+    def get_price(self, price_params: dict) -> float | None:
         """
         Function returns coingecko price for a token address,
         closest to and at least as large as the block timestamp for a given tx hash.
         """
-
+        token_address, block_number = extract_params(price_params, is_block=True)
         block_start_timestamp = self.web3.eth.get_block(block_number)["timestamp"]
         if self.price_not_retrievable(block_start_timestamp):
             return None
