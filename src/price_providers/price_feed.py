@@ -11,7 +11,6 @@ class PriceFeed:
     def __init__(self):
         self.providers = [
             CoingeckoPriceProvider(),
-            DunePriceProvider(),
             MoralisPriceProvider(),
             AuctionPriceProvider(),
         ]
