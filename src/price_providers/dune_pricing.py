@@ -55,7 +55,7 @@ class DunePriceProvider(AbstractPriceProvider):
             try:
                 result = dune.run_query(query=query)  # type: ignore[attr-defined]
             except DuneError as e:
-                logger.warning(f"Unable to run query, Dune returned with error {e}")
+                self.logger.warning(f"Unable to run query, Dune returned with error {e}")
                 return None
             if result.result.rows:
                 row = result.result.rows[0]
