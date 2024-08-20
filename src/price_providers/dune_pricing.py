@@ -3,7 +3,7 @@ from src.price_providers.pricing_model import AbstractPriceProvider
 from dune_client.types import QueryParameter
 from dune_client.client import DuneClient
 from dune_client.query import QueryBase
-from dune_client.modesl import DuneError
+from dune_client.models import DuneError
 from src.helpers.config import get_web3_instance, get_logger
 from src.helpers.helper_functions import extract_params
 from src.constants import DUNE_PRICE_QUERY_ID, DUNE_QUERY_BUFFER_TIME
