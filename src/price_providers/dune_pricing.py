@@ -3,6 +3,7 @@ from src.price_providers.pricing_model import AbstractPriceProvider
 from dune_client.types import QueryParameter
 from dune_client.client import DuneClient
 from dune_client.query import QueryBase
+from dune_client.modesl import DuneError
 from src.helpers.config import get_web3_instance, get_logger
 from src.helpers.helper_functions import extract_params
 from src.constants import DUNE_PRICE_QUERY_ID, DUNE_QUERY_BUFFER_TIME
@@ -51,7 +52,11 @@ class DunePriceProvider(AbstractPriceProvider):
                     ),
                 ],
             )
-            result = dune.run_query(query=query)  # type: ignore[attr-defined]
+            try:
+                result = dune.run_query(query=query)  # type: ignore[attr-defined]
+            except DuneError as e:
+                logger.error(f"Unable to run query, dune returned with error {e}")
+                return None
             if result.result.rows:
                 row = result.result.rows[0]
                 price = row.get("price")
