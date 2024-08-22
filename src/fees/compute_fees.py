@@ -587,6 +587,6 @@ def batch_fee_imbalances(
 ) -> tuple[dict[str, int], dict[str, int]]:
     onchain_data, offchain_data = fetch_settlement_data(tx_hash)
     protocol_fees, network_fees = compute_fee_imbalances(onchain_data, offchain_data)
-    protocol_fees = {token: fee for token, fee in protocol_fees.items()}
-    network_fees = {token: fee for token, fee in network_fees.items()}
+    protocol_fees = {token.hex(): fee for token, fee in protocol_fees.items()}
+    network_fees = {token.hex(): fee for token, fee in network_fees.items()}
     return protocol_fees, network_fees
