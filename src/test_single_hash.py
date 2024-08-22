@@ -14,10 +14,6 @@ def log_token_data(title: str, data: dict, name: str):
 
 
 class Compute:
-    """
-    Class that allows one to fetch imbalances, fees, final slippage via a tx hash.
-    """
-
     def __init__(self):
         self.web3 = get_web3_instance()
         self.imbalances = RawTokenImbalances(self.web3, "mainnet")
