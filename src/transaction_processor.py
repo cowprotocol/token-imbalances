@@ -1,5 +1,4 @@
 from hexbytes import HexBytes
-from web3 import Web3
 from src.helpers.blockchain_data import BlockchainData
 from src.helpers.database import Database
 from src.imbalances_script import RawTokenImbalances
