@@ -588,19 +588,12 @@ def batch_fee_imbalances(
     onchain_data, offchain_data = fetch_settlement_data(tx_hash)
     protocol_fees, network_fees = compute_fee_imbalances(onchain_data, offchain_data)
     protocol_fees = {
-        Web3.to_checksum_address(token.hex()): fee
+        token.hex(): fee
         for token, fee in protocol_fees.items()
     }
     network_fees = {
-        Web3.to_checksum_address(token.hex()): fee
+        token.hex(): fee
         for token, fee in network_fees.items()
     }
     return protocol_fees, network_fees
 
-
-# if __name__ == "__main__":
-#     tx_hash = HexBytes(
-#         "0xbd8cf4a21ad811cc3b9e49cff5e95563c3c2651b0ea41e0f8a7987818205c984"
-#     )
-#     protocol_fees, network_fees = batch_fee_imbalances(tx_hash)
-#     print(protocol_fees)
