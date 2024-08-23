@@ -458,7 +458,7 @@ def compute_fee_imbalances(
         else:
             network_fee_sell = network_fee
 
-        network_fees[trade.sell_token.to_0x.hex()] = network_fee_sell
+        network_fees[trade.sell_token.to_0x_hex()] = network_fee_sell
 
     return protocol_fees, network_fees
 
