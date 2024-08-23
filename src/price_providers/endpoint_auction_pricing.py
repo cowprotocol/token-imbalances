@@ -43,8 +43,11 @@ class AuctionPriceProvider(AbstractPriceProvider):
                 return price_in_eth
 
             except requests.exceptions.HTTPError as err:
-                if err.response.status_code == 404:
-                    pass
+                # Continue to check if tx present on barn.
+                if err.response.status_code == 404 and environment == "prod":
+                    continue
+                # Error logged if tx not found on barn either.
+                logger.error(f"Error: {err}")
             except requests.exceptions.RequestException as req_err:
                 logger.error(f"Error occurred during request: {req_err}")
             except KeyError as key_err:

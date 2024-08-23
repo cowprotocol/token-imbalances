@@ -53,6 +53,6 @@ class MoralisPriceProvider(AbstractPriceProvider):
             self.logger.warning(f"Error: {e}")
         except Exception as e:
             self.logger.warning(
-                f"Error: {e}, Likely the token: {token_address} was not found or API limit reached."
+                f"Price retrieval for token: {token_address} returned: {e}"
             )
         return None
