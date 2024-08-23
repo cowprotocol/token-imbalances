@@ -373,7 +373,9 @@ class OrderbookFetcher:
             except requests.exceptions.HTTPError as err:
                 if err.response.status_code == 404:
                     pass
-        raise ConnectionError(f"Error fetching off-chain data for tx {tx_hash.to_0x_hex()}")
+        raise ConnectionError(
+            f"Error fetching off-chain data for tx {tx_hash.to_0x_hex()}"
+        )
 
     def get_order_data(self, uid: HexBytes, environment: str):
         prefix = self.orderbook_urls[environment]
