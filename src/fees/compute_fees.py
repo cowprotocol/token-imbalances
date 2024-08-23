@@ -379,7 +379,7 @@ class OrderbookFetcher:
 
     def get_order_data(self, uid: HexBytes, environment: str):
         prefix = self.orderbook_urls[environment]
-        url = prefix + f"orders/{uid.hex()}"
+        url = prefix + f"orders/{uid.to_0x_hex()}"
         response = requests.get(
             url,
             timeout=REQUEST_TIMEOUT,
