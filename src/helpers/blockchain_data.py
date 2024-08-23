@@ -46,7 +46,7 @@ class BlockchainData:
             block = self.web3.eth.get_block(block_number, full_transactions=True)
             for tx in block.transactions:  # type: ignore[attr-defined]
                 if tx.to and tx.to.lower() == SETTLEMENT_CONTRACT_ADDRESS.lower():
-                    tx_hashes_blocks.append((tx.hash.hex(), block_number))
+                    tx_hashes_blocks.append((tx.hash.to_0x_hex(), block_number))
         return tx_hashes_blocks
 
     def get_auction_id(self, tx_hash: str) -> int:
