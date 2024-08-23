@@ -1,4 +1,5 @@
 from hexbytes import HexBytes
+from web3 import Web3
 from src.helpers.blockchain_data import BlockchainData
 from src.helpers.database import Database
 from src.imbalances_script import RawTokenImbalances
@@ -155,12 +156,26 @@ def calculate_slippage(
     network_fees: dict[str, int],
 ) -> dict[str, int]:
     """Function calculates net slippage for each token per tx."""
-    # set of all tokens from all three dicts
+
+    # Perform checksum on all keys
+    token_imbalances = {
+        Web3.to_checksum_address(token): value
+        for token, value in token_imbalances.items()
+    }
+    protocol_fees = {
+        Web3.to_checksum_address(token): value for token, value in protocol_fees.items()
+    }
+    network_fees = {
+        Web3.to_checksum_address(token): value for token, value in network_fees.items()
+    }
+
+    # Set of all tokens from all three dicts
     all_tokens = (
         set(token_imbalances.keys())
         .union(protocol_fees.keys())
         .union(network_fees.keys())
     )
+
     slippage = {}
 
     # calculate net slippage per token
