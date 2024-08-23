@@ -5,21 +5,13 @@ from fractions import Fraction
 import math
 import os
 from typing import Any
-
-
 from dotenv import load_dotenv
 from eth_typing import Address
 from hexbytes import HexBytes
-from web3 import Web3
-from web3.logs import DISCARD
-from web3.types import TxData, TxReceipt, EventData
 
 from src.constants import (
-    SETTLEMENT_CONTRACT_ADDRESS,
     REQUEST_TIMEOUT,
 )
-from contracts.gpv2_settlement_abi import gpv2_settlement_abi
-
 import requests
 
 # types for trades
@@ -32,7 +24,6 @@ class Trade:
     order_uid: HexBytes
     sell_amount: int
     buy_amount: int
-    owner: HexBytes
     sell_token: HexBytes
     buy_token: HexBytes
     limit_sell_amount: int
@@ -40,6 +31,7 @@ class Trade:
     kind: str
     sell_token_clearing_price: int
     buy_token_clearing_price: int
+    fee_policies: list["FeePolicy"]
 
     def volume(self) -> int:
         """Compute volume of a trade in the surplus token"""
@@ -70,20 +62,20 @@ class Trade:
             return current_limit_sell_amount - self.sell_amount
         raise ValueError(f"Order kind {self.kind} is invalid.")
 
-    def raw_surplus(self, fee_policies: list["FeePolicy"]) -> int:
+    def raw_surplus(self) -> int:
         """Compute raw surplus of a trade in the surplus token
         First, the application of protocol fees is reversed. Then, surplus of the resulting trade
         is computed."""
         raw_trade = deepcopy(self)
-        for fee_policy in reversed(fee_policies):
+        for fee_policy in reversed(self.fee_policies):
             raw_trade = fee_policy.reverse_protocol_fee(raw_trade)
         return raw_trade.surplus()
 
-    def protocol_fee(self, fee_policies):
+    def protocol_fee(self):
         """Compute protocol fees of a trade in the surplus token
         Protocol fees are computed as the difference of raw surplus and surplus."""
 
-        return self.raw_surplus(fee_policies) - self.surplus()
+        return self.raw_surplus() - self.surplus()
 
     def surplus_token(self) -> HexBytes:
         """Returns the surplus token"""
@@ -270,116 +262,24 @@ class PriceImprovementFeePolicy(FeePolicy):
 
 
 @dataclass
-class OnchainSettlementData:
-    """Class to describe onchain info about a settlement."""
-
-    auction_id: int
-    tx_hash: HexBytes
-    solver: HexBytes
-    call_data: HexBytes
-    trades: list[Trade]
-
-
-@dataclass
-class OffchainSettlementData:
-    """Class to describe offchain info about a settlement."""
+class SettlementData:
+    """Class to describe info about a settlement."""
 
     # pylint: disable=too-many-instance-attributes
 
     auction_id: int
+    tx_hash: HexBytes
     solver: HexBytes
-    call_data: HexBytes
-    trade_fee_policies: dict[HexBytes, list[FeePolicy]]
-    score: int
-    valid_orders: set[HexBytes]
-    jit_order_addresses: set[HexBytes]
+    trades: list[Trade]
     native_prices: dict[HexBytes, int]
 
 
 # fetching data
 
 
-class BlockchainFetcher:
+class OrderbookFetcher:
     """
-    Class to connect to a node and fetch/process onchain data.
-    """
-
-    def __init__(self) -> None:
-        load_dotenv()
-
-        node_url = os.getenv("NODE_URL")
-        self.node = Web3(Web3.HTTPProvider(node_url))
-
-        self.contract = self.node.eth.contract(
-            address=Address(HexBytes(SETTLEMENT_CONTRACT_ADDRESS)),
-            abi=gpv2_settlement_abi,
-        )
-
-    def get_onchain_data(self, tx_hash: HexBytes) -> OnchainSettlementData:
-        """
-        This function can error since nodes are called.
-        """
-        transaction = self.node.eth.get_transaction(tx_hash)
-        receipt = self.node.eth.wait_for_transaction_receipt(tx_hash)
-        decoded_data = self.decode_data(transaction, receipt)
-        return decoded_data
-
-    def decode_data(
-        self, transaction: TxData, receipt: TxReceipt
-    ) -> OnchainSettlementData:
-        """
-        Method that decodes a tx and returns a summary of this decoding.
-        """
-        tx_hash = transaction["hash"]
-        call_data = transaction["input"]
-        if isinstance(call_data, str):
-            call_data = bytes.fromhex(call_data[2:])
-        auction_id = int.from_bytes(call_data[-8:], byteorder="big")
-
-        settlement_event = self.contract.events.Settlement().process_receipt(
-            receipt, errors=DISCARD
-        )[0]
-        solver = HexBytes(settlement_event["args"]["solver"])
-        trade_events: tuple[EventData] = self.contract.events.Trade().process_receipt(
-            receipt, errors=DISCARD
-        )
-
-        settlement = self.contract.decode_function_input(call_data)[1]
-
-        tokens = settlement["tokens"]
-        prices = settlement["clearingPrices"]
-
-        trades: list[Trade] = []
-        for trade_event, settlement_trade in zip(trade_events, settlement["trades"]):
-            sell_token_address = HexBytes(tokens[settlement_trade["sellTokenIndex"]])
-            buy_token_address = HexBytes(tokens[settlement_trade["buyTokenIndex"]])
-            sell_token_clearing_price = prices[
-                tokens.index(tokens[settlement_trade["sellTokenIndex"]])
-            ]
-            buy_token_clearing_price = prices[
-                tokens.index(tokens[settlement_trade["buyTokenIndex"]])
-            ]
-            trade = Trade(
-                HexBytes(trade_event["args"]["orderUid"]),
-                trade_event["args"]["sellAmount"],
-                trade_event["args"]["buyAmount"],
-                HexBytes(trade_event["args"]["owner"]),
-                sell_token_address,
-                buy_token_address,
-                settlement_trade["sellAmount"],
-                settlement_trade["buyAmount"],
-                "sell" if settlement_trade["flags"] % 2 == 0 else "buy",
-                sell_token_clearing_price,
-                buy_token_clearing_price,
-            )
-            trades.append(trade)
-
-        return OnchainSettlementData(auction_id, tx_hash, solver, call_data, trades)
-
-
-class OrderbookAWSFetcher:
-    """
-    This is a class for connecting to the db, and contains a few functions that
+    This is a class for connecting to the orderbook api, and contains a few functions that
     fetch necessary data to run the checks that we need.
     """
 
@@ -391,113 +291,113 @@ class OrderbookAWSFetcher:
             "prod": f"https://api.cow.fi/{chain_name}/api/v1/",
             "barn": f"https://barn.api.cow.fi/{chain_name}/api/v1/",
         }
-        self.aws_urls = {
-            "prod": "https://solver-instances.s3.eu-central-1.amazonaws.com/"
-            f"prod/{chain_name}/autopilot/",
-            "barn": "https://solver-instances.s3.eu-central-1.amazonaws.com/"
-            f"staging/{chain_name}/autopilot/",
-        }
 
-    def get_offchain_data(
-        self, onchain_data: OnchainSettlementData
-    ) -> OffchainSettlementData:
+    def get_all_data(self, tx_hash: HexBytes) -> SettlementData:
         """
         Method that fetches all necessary data from the API.
         """
-        solver = onchain_data.solver
-        auction_id = onchain_data.auction_id
+        endpoint_data, environment = self.get_auction_data(tx_hash)
 
-        solution_data, environment = self.get_solution_data(auction_id, solver)
-        auction_data = self.get_auction_data(auction_id, environment)
+        solutions = endpoint_data["solutions"]
+        # here we detect the winning solution
+        for sol in solutions:
+            if sol["ranking"] == 1:
+                winning_sol = sol
 
-        offchain_data = self.convert_to_offchain_data(
-            onchain_data,
-            auction_data,
-            solution_data,
-        )
-        return offchain_data
+        auction_id = endpoint_data["auctionId"]
+        solver = HexBytes(winning_sol["solverAddress"])
 
-    def convert_to_offchain_data(
-        self,
-        onchain_data: OnchainSettlementData,
-        auction_data: dict[str, Any],
-        solution_data: dict[str, Any],
-    ) -> OffchainSettlementData:
-        """Turn Row from database query into OffchainSettlementData"""
-        # pylint: disable=too-many-locals
-        auction_id = onchain_data.auction_id
-
-        solver = HexBytes(solution_data["solverAddress"])
-        call_data = HexBytes(solution_data["callData"])
-
-        trade_fee_policies: dict[HexBytes, list[FeePolicy]] = {}
-        onchain_trades_dict = {trade.order_uid: trade for trade in onchain_data.trades}
-        protocol_fees_dict = {
-            HexBytes(order["uid"]): order["protocolFees"]
-            for order in auction_data["orders"]
-            if HexBytes(order["uid"]) in onchain_trades_dict
-        }
-        for order in solution_data["orders"]:
-            order_uid = HexBytes(order["id"])
-
-            fee_policies = self.parse_fee_policies(
-                protocol_fees_dict.get(order_uid, [])
-            )
-
-            trade_fee_policies[order_uid] = fee_policies
-
-        score = int(solution_data["score"])
-        valid_orders = {HexBytes(order["uid"]) for order in auction_data["orders"]}
-        native_prices = {
+        executed_orders = [
+            (HexBytes(order["id"]), int(order["sellAmount"]), int(order["buyAmount"]))
+            for order in winning_sol["orders"]
+        ]
+        clearing_prices = {
             HexBytes(address): int(price)
-            for address, price in auction_data["prices"].items()
+            for address, price in winning_sol["clearingPrices"].items()
         }
-        jit_order_addresses = {
-            HexBytes(address)
-            for address in auction_data["surplusCapturingJitOrderOwners"]
+        native_prices = {
+            address: int(endpoint_data["auction"]["prices"][address.hex()])
+            for address, _ in clearing_prices.items()
         }
+        trades = []
+        for uid, executed_sell_amount, executed_buy_amount in executed_orders:
+            order_data = self.get_order_data(uid, environment)
+            if order_data == None:
+                # this can only happen for now if the order is a jit CoW AMM order
+                continue
+            trade_data = self.get_trade_data(uid, tx_hash, environment)
 
-        return OffchainSettlementData(
-            auction_id,
-            solver,
-            call_data,
-            trade_fee_policies,
-            score,
-            valid_orders,
-            jit_order_addresses,
-            native_prices,
+            kind = order_data["kind"]
+            sell_token = HexBytes(order_data["sellToken"])
+            buy_token = HexBytes(order_data["buyToken"])
+            limit_sell_amount = int(order_data["sellAmount"])
+            limit_buy_amount = int(order_data["buyAmount"])
+            sell_token_clearing_price = clearing_prices[sell_token]
+            buy_token_clearing_price = clearing_prices[buy_token]
+            fee_policies = self.parse_fee_policies(trade_data["feePolicies"])
+
+            trade = Trade(
+                order_uid=uid,
+                sell_amount=executed_sell_amount,
+                buy_amount=executed_buy_amount,
+                sell_token=sell_token,
+                buy_token=buy_token,
+                limit_sell_amount=limit_sell_amount,
+                limit_buy_amount=limit_buy_amount,
+                kind=kind,
+                sell_token_clearing_price=sell_token_clearing_price,
+                buy_token_clearing_price=buy_token_clearing_price,
+                fee_policies=fee_policies,
+            )
+            trades.append(trade)
+
+        settlement_data = SettlementData(
+            auction_id=auction_id,
+            tx_hash=tx_hash,
+            solver=solver,
+            trades=trades,
+            native_prices=native_prices,
         )
+        return settlement_data
 
-    def get_solution_data(
-        self, auction_id: int, solver: HexBytes
-    ) -> tuple[dict[str, Any], str]:
-        """Fetch competition data from the database"""
+    def get_auction_data(self, tx_hash: HexBytes):
         for environment, url in self.orderbook_urls.items():
             try:
                 response = requests.get(
-                    url + f"solver_competition/{auction_id}",
+                    url + f"solver_competition/by_tx_hash/{tx_hash.hex()}",
                     timeout=REQUEST_TIMEOUT,
                 )
                 response.raise_for_status()
-                solution_data = response.json()["solutions"][-1]
-                if HexBytes(solution_data["solverAddress"]) == solver:
-                    return solution_data, environment
+                auction_data = response.json()
+                return auction_data, environment
             except requests.exceptions.HTTPError as err:
                 if err.response.status_code == 404:
                     pass
-        raise ConnectionError(f"Error fetching off-chain data for id {auction_id}")
+        raise ConnectionError(f"Error fetching off-chain data for tx {tx_hash.hex()}")
 
-    def get_auction_data(
-        self,
-        auction_id: int,
-        environment: str,
-    ) -> dict[str, Any]:
-        """Fetch auction data from AWS."""
-        url = self.aws_urls[environment] + f"{auction_id}.json"
-        response = requests.get(url, timeout=REQUEST_TIMEOUT)
-        response.raise_for_status()
-        auction_data: dict[str, Any] = response.json()
-        return auction_data
+    def get_order_data(self, uid: HexBytes, environment: str):
+        prefix = self.orderbook_urls[environment]
+        url = prefix + f"orders/{uid.hex()}"
+        response = requests.get(
+            url,
+            timeout=REQUEST_TIMEOUT,
+        )
+        if response.ok == False:
+            # jit CoW AMM detected
+            return None
+        order_data = response.json()
+        return order_data
+
+    def get_trade_data(self, uid: HexBytes, tx_hash: HexBytes, environment: str):
+        prefix = self.orderbook_urls[environment]
+        url = prefix + f"trades?orderUid={uid.hex()}"
+        response = requests.get(url)
+        trade_data_temp = response.json()
+        for t in trade_data_temp:
+            if HexBytes(t["txHash"]) == tx_hash:
+                trade_data = t
+                break
+        return trade_data
 
     def parse_fee_policies(
         self, protocol_fee_datum: list[dict[str, Any]]
@@ -534,29 +434,19 @@ class OrderbookAWSFetcher:
         return fee_policies
 
 
-def fetch_settlement_data(
-    tx_hash: HexBytes,
-) -> tuple[OnchainSettlementData, OffchainSettlementData]:
-    onchain_fetcher = BlockchainFetcher()
-    offchain_fetcher = OrderbookAWSFetcher()
-
-    onchain_data = onchain_fetcher.get_onchain_data(tx_hash)
-    offchain_data = offchain_fetcher.get_offchain_data(onchain_data)
-
-    return onchain_data, offchain_data
-
-
+# computing fees
 def compute_fee_imbalances(
-    onchain_data: OnchainSettlementData, offchain_data: OffchainSettlementData
-) -> tuple[dict[str, int], dict[str, int]]:
-    protocol_fees: dict[str, int] = {}
-    network_fees: dict[str, int] = {}
-    for trade in onchain_data.trades:
+    settlement_data: SettlementData,
+) -> tuple[dict[HexBytes, int], dict[HexBytes, int]]:
+    protocol_fees: dict[HexBytes, int] = {}
+    network_fees: dict[HexBytes, int] = {}
+    for trade in settlement_data.trades:
         # protocol fees
-        fee_policies = offchain_data.trade_fee_policies[trade.order_uid]
-        protocol_fee_amount = trade.protocol_fee(fee_policies)
+        fee_policies = trade.fee_policies
+        protocol_fee_amount = trade.protocol_fee()
         protocol_fee_token = trade.surplus_token()
-        protocol_fees[protocol_fee_token.to_0x_hex()] = protocol_fee_amount
+        protocol_fees[protocol_fee_token] = protocol_fee_amount
+
         # network fees
         surplus_fee = trade.compute_surplus_fee()  # in the surplus token
         network_fee = surplus_fee - protocol_fee_amount
@@ -569,7 +459,9 @@ def compute_fee_imbalances(
             )
         else:
             network_fee_sell = network_fee
-        network_fees[trade.sell_token.to_0x_hex()] = network_fee_sell
+
+        network_fees[trade.sell_token] = network_fee_sell
+
     return protocol_fees, network_fees
 
 
@@ -579,6 +471,9 @@ def compute_fee_imbalances(
 def batch_fee_imbalances(
     tx_hash: HexBytes,
 ) -> tuple[dict[str, int], dict[str, int]]:
-    onchain_data, offchain_data = fetch_settlement_data(tx_hash)
-    protocol_fees, network_fees = compute_fee_imbalances(onchain_data, offchain_data)
+    orderbook_api = OrderbookFetcher()
+    settlement_data = orderbook_api.get_all_data(tx_hash)
+    protocol_fees, network_fees = compute_fee_imbalances(settlement_data)
+    protocol_fees = {token.hex(): fee for token, fee in protocol_fees.items()}
+    network_fees = {token.hex(): fee for token, fee in network_fees.items()}
     return protocol_fees, network_fees
