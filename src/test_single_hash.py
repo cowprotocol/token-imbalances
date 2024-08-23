@@ -1,4 +1,5 @@
 from hexbytes import HexBytes
+from web3 import Web3
 from src.imbalances_script import RawTokenImbalances
 from src.price_providers.price_feed import PriceFeed
 from src.fees.compute_fees import batch_fee_imbalances
@@ -41,18 +42,23 @@ class Compute:
             block_number = receipt.blockNumber
             for token_address, amt in slippage.items():
                 if amt != 0:
-                    price_data = self.price_providers.get_price(
-                        block_number, token_address
-                    )
+                    price_params = {
+                        "block_number": block_number,
+                        "token_address": token_address,
+                        "tx_hash": tx_hash,
+                    }
+                    price_data = self.price_providers.get_price(price_params)
                     if price_data:
                         price, _ = price_data
-                        decimals = self._get_token_decimals(token_address)
+                        decimals = self.get_token_decimals(token_address)
                         slippage_in_eth = price * (amt / (10**decimals))
                         eth_slippage[token_address] = slippage_in_eth
         return eth_slippage
 
-    def _get_token_decimals(self, token_address: str) -> int:
-        contract = self.web3.eth.contract(address=token_address, abi=erc20_abi)
+    def get_token_decimals(self, token_address: str) -> int:
+        contract = self.web3.eth.contract(
+            address=Web3.to_checksum_address(token_address), abi=erc20_abi
+        )
         return contract.functions.decimals().call()
 
     def log_results(
