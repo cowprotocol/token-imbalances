@@ -316,7 +316,7 @@ class OrderbookFetcher:
             for address, price in winning_sol["clearingPrices"].items()
         }
         native_prices = {
-            address: int(endpoint_data["auction"]["prices"][address.hex()])
+            address: int(endpoint_data["auction"]["prices"][address.to_0x_hex()])
             for address, _ in clearing_prices.items()
         }
         trades = []
@@ -364,16 +364,18 @@ class OrderbookFetcher:
         for environment, url in self.orderbook_urls.items():
             try:
                 response = requests.get(
-                    url + f"solver_competition/by_tx_hash/{tx_hash.hex()}",
+                    url + f"solver_competition/by_tx_hash/{tx_hash.to_0x_hex()}",
                     timeout=REQUEST_TIMEOUT,
                 )
                 response.raise_for_status()
+                if not response.ok:
+                    continue
                 auction_data = response.json()
                 return auction_data, environment
             except requests.exceptions.HTTPError as err:
                 if err.response.status_code == 404:
                     pass
-        raise ConnectionError(f"Error fetching off-chain data for tx {tx_hash.hex()}")
+        raise ConnectionError(f"Error fetching off-chain data for tx {tx_hash.to_0x_hex()}")
 
     def get_order_data(self, uid: HexBytes, environment: str):
         prefix = self.orderbook_urls[environment]
@@ -390,7 +392,7 @@ class OrderbookFetcher:
 
     def get_trade_data(self, uid: HexBytes, tx_hash: HexBytes, environment: str):
         prefix = self.orderbook_urls[environment]
-        url = prefix + f"trades?orderUid={uid.hex()}"
+        url = prefix + f"trades?orderUid={uid.to_0x_hex()}"
         response = requests.get(url)
         trade_data_temp = response.json()
         for t in trade_data_temp:
