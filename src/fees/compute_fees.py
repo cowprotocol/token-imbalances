@@ -368,8 +368,6 @@ class OrderbookFetcher:
                     timeout=REQUEST_TIMEOUT,
                 )
                 response.raise_for_status()
-                if not response.ok:
-                    continue
                 auction_data = response.json()
                 return auction_data, environment
             except requests.exceptions.HTTPError as err:
