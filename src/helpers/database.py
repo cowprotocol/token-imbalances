@@ -97,3 +97,31 @@ class Database:
                 "price": price,
             },
         )
+
+    def write_fees(
+        self,
+        chain_name: str,
+        auction_id: int,
+        block_number: int,
+        tx_hash: str,
+        token_address: str,
+        fee_amount: float,
+        fee_type: str,
+    ):
+        """Function attempts to write price data to the table."""
+        tx_hash_bytes = bytes.fromhex(tx_hash[2:])
+        token_address_bytes = bytes.fromhex(token_address[2:])
+
+        query = read_sql_file("src/sql/insert_fee.sql")
+        self.execute_and_commit(
+            query,
+            {
+                "chain_name": self.chain_name,
+                "auction_id": auction_id,
+                "block_number": block_number,
+                "tx_hash": tx_hash_bytes,
+                "token_address": token_address_bytes,
+                "fee_amount": fee_amount,
+                "fee_type": fee_type,
+            },
+        )
