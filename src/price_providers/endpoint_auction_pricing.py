@@ -20,6 +20,7 @@ class AuctionPriceProvider(AbstractPriceProvider):
     def get_price(self, price_params: dict) -> float | None:
         """Function returns Auction price from endpoint for a token address."""
         token_address, tx_hash = extract_params(price_params, is_block=False)
+        unchecked_endpoints_count = len(self.endpoint_urls)
         for environment, url in self.endpoint_urls.items():
             try:
                 # append tx_hash to endpoint
@@ -43,10 +44,11 @@ class AuctionPriceProvider(AbstractPriceProvider):
                 return price_in_eth
 
             except requests.exceptions.HTTPError as err:
+                unchecked_endpoints_count -= 1
                 # Continue to check if tx present on barn.
-                if err.response.status_code == 404 and environment == "prod":
+                if err.response.status_code == 404 and unchecked_endpoints_count != 0:
                     continue
-                # Error logged if tx not found on barn either.
+                # Error logged for the last endpoint in the list (expected: barn)
                 logger.error(f"Error: {err}")
             except requests.exceptions.RequestException as req_err:
                 logger.error(f"Error occurred during request: {req_err}")
