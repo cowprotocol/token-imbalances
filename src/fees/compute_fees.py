@@ -437,16 +437,14 @@ class OrderbookFetcher:
 # computing fees
 def compute_fee_imbalances(
     settlement_data: SettlementData,
-) -> tuple[dict[HexBytes, int], dict[HexBytes, int]]:
-    protocol_fees: dict[HexBytes, int] = {}
-    network_fees: dict[HexBytes, int] = {}
+) -> tuple[dict[str, int], dict[str, int]]:
+    protocol_fees: dict[str, int] = {}
+    network_fees: dict[str, int] = {}
     for trade in settlement_data.trades:
         # protocol fees
-        fee_policies = trade.fee_policies
         protocol_fee_amount = trade.protocol_fee()
         protocol_fee_token = trade.surplus_token()
-        protocol_fees[protocol_fee_token] = protocol_fee_amount
-
+        protocol_fees[protocol_fee_token.to_0x_hex()] = protocol_fee_amount
         # network fees
         surplus_fee = trade.compute_surplus_fee()  # in the surplus token
         network_fee = surplus_fee - protocol_fee_amount
@@ -460,7 +458,7 @@ def compute_fee_imbalances(
         else:
             network_fee_sell = network_fee
 
-        network_fees[trade.sell_token] = network_fee_sell
+        network_fees[trade.sell_token.to_0x.hex()] = network_fee_sell
 
     return protocol_fees, network_fees
 
@@ -474,6 +472,4 @@ def batch_fee_imbalances(
     orderbook_api = OrderbookFetcher()
     settlement_data = orderbook_api.get_all_data(tx_hash)
     protocol_fees, network_fees = compute_fee_imbalances(settlement_data)
-    protocol_fees = {token.hex(): fee for token, fee in protocol_fees.items()}
-    network_fees = {token.hex(): fee for token, fee in network_fees.items()}
     return protocol_fees, network_fees
