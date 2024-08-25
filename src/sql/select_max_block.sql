@@ -8,4 +8,8 @@ FROM (
     SELECT MAX(block_number) AS max_block_number 
     FROM slippage_prices
     WHERE chain_name = :chain_name
+    UNION ALL
+    SELECT MAX(block_number) AS max_block_number 
+    FROM fees
+    WHERE chain_name = :chain_name
 ) AS max_blocks;
