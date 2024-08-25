@@ -41,12 +41,14 @@ class BlockchainData:
         involving the settlement contract.
         """
         tx_hashes_blocks = []
-
         for block_number in range(start_block, end_block + 1):
             block = self.web3.eth.get_block(block_number, full_transactions=True)
             for tx in block.transactions:  # type: ignore[attr-defined]
                 if tx.to and tx.to.lower() == SETTLEMENT_CONTRACT_ADDRESS.lower():
-                    tx_hashes_blocks.append((tx.hash.to_0x_hex(), block_number))
+                    receipt = self.web3.eth.get_transaction_receipt(tx.hash)
+                    # status = 0 indicates a reverted tx, status = 1 is successful tx
+                    if receipt.status == 1:  # type: ignore[attr-defined]
+                        tx_hashes_blocks.append((tx.hash.to_0x_hex(), block_number))
         return tx_hashes_blocks
 
     def get_auction_id(self, tx_hash: str) -> int:
