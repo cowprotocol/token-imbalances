@@ -1,7 +1,7 @@
 from hexbytes import HexBytes
 from web3 import Web3
 from src.helpers.config import logger
-from src.constants import SETTLEMENT_CONTRACT_ADDRESS
+from src.constants import SETTLEMENT_CONTRACT_ADDRESS, INVALIDATED_ORDER_TOPIC
 
 
 class BlockchainData:
@@ -46,6 +46,12 @@ class BlockchainData:
             for tx in block.transactions:  # type: ignore[attr-defined]
                 if tx.to and tx.to.lower() == SETTLEMENT_CONTRACT_ADDRESS.lower():
                     receipt = self.web3.eth.get_transaction_receipt(tx.hash)
+                    # ignore txs that trigger the OrderInvalidated event
+                    if any(
+                        log.topics[0].to_0x_hex() == INVALIDATED_ORDER_TOPIC
+                        for log in receipt.logs  # type: ignore[attr-defined]
+                    ):
+                        continue
                     # status = 0 indicates a reverted tx, status = 1 is successful tx
                     if receipt.status == 1:  # type: ignore[attr-defined]
                         tx_hashes_blocks.append((tx.hash.to_0x_hex(), block_number))
