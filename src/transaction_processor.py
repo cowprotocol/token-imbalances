@@ -120,21 +120,27 @@ class TransactionProcessor:
                 )
 
             # Write to database iff no errors in either computations
-            if self.process_imbalances or self.process_fees or self.process_prices:
-                if self.process_imbalances and token_imbalances:
-                    self.handle_imbalances(
-                        token_imbalances, tx_hash, auction_id, block_number
-                    )
+            if (
+                (not self.process_imbalances)
+                and (not self.process_fees)
+                and (not self.process_prices)
+            ):
+                return
 
-                if self.process_fees:
-                    self.handle_fees(
-                        protocol_fees, network_fees, auction_id, block_number, tx_hash
-                    )
+            if self.process_imbalances and token_imbalances:
+                self.handle_imbalances(
+                    token_imbalances, tx_hash, auction_id, block_number
+                )
 
-                if self.process_prices and prices:
-                    self.handle_prices(prices, tx_hash, block_number)
+            if self.process_fees:
+                self.handle_fees(
+                    protocol_fees, network_fees, auction_id, block_number, tx_hash
+                )
 
-                logger.info("\n".join(self.log_message))
+            if self.process_prices and prices:
+                self.handle_prices(prices, tx_hash, block_number)
+
+            logger.info("\n".join(self.log_message))
 
         except Exception as err:
             logger.error(f"An Error occurred: {err}")
