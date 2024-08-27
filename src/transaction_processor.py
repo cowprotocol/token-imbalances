@@ -126,7 +126,7 @@ class TransactionProcessor:
     ):
         """This function loops over (token, fee) and calls write_fees to write to table."""
         # Write protocol fees
-        for token_address, fee_amount in protocol_fees.items():
+        for order_uid, (token_address, fee_amount) in protocol_fees.items():
             self.db.write_fees(
                 chain_name=self.chain_name,
                 auction_id=auction_id,
@@ -138,7 +138,7 @@ class TransactionProcessor:
             )
 
         # Write network fees
-        for token_address, fee_amount in network_fees.items():
+        for order_uid, (token_address, fee_amount) in network_fees.items():
             self.db.write_fees(
                 chain_name=self.chain_name,
                 auction_id=auction_id,
@@ -152,28 +152,31 @@ class TransactionProcessor:
 
 def calculate_slippage(
     token_imbalances: dict[str, int],
-    protocol_fees: dict[str, int],
-    network_fees: dict[str, int],
+    protocol_fees: dict[str, tuple[str, int]],
+    network_fees: dict[str, tuple[str, int]],
 ) -> dict[str, int]:
     """Function calculates net slippage for each token per tx."""
 
-    # Perform checksum on all keys
+    # checksum on token addresses
     token_imbalances = {
         Web3.to_checksum_address(token): value
         for token, value in token_imbalances.items()
     }
     protocol_fees = {
-        Web3.to_checksum_address(token): value for token, value in protocol_fees.items()
+        order_uid: (Web3.to_checksum_address(token_address), fee_amount)
+        for order_uid, (token_address, fee_amount) in protocol_fees.items()
     }
+
     network_fees = {
-        Web3.to_checksum_address(token): value for token, value in network_fees.items()
+        order_uid: (Web3.to_checksum_address(token_address), fee_amount)
+        for order_uid, (token_address, fee_amount) in network_fees.items()
     }
 
     # Set of all tokens from all three dicts
     all_tokens = (
         set(token_imbalances.keys())
-        .union(protocol_fees.keys())
-        .union(network_fees.keys())
+        .union([token_address for token_address, _ in protocol_fees.values()])
+        .union([token_address for token_address, _ in network_fees.values()])
     )
 
     slippage = {}
@@ -181,9 +184,16 @@ def calculate_slippage(
     # calculate net slippage per token
     for token in all_tokens:
         imbalance = token_imbalances.get(token, 0)
-        protocol_fee = protocol_fees.get(token, 0)
-        network_fee = network_fees.get(token, 0)
-
+        protocol_fee = sum(
+            fee_amount
+            for _, (token_address, fee_amount) in protocol_fees.items()
+            if token_address == token
+        )
+        network_fee = sum(
+            fee_amount
+            for _, (token_address, fee_amount) in network_fees.items()
+            if token_address == token
+        )
         total = imbalance - protocol_fee - network_fee
         slippage[token] = total
 

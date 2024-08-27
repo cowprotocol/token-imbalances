@@ -446,7 +446,10 @@ def compute_fee_imbalances(
         # protocol fees
         protocol_fee_amount = trade.protocol_fee()
         protocol_fee_token = trade.surplus_token()
-        protocol_fees[protocol_fee_token.to_0x_hex()] = protocol_fee_amount
+        protocol_fees[trade.order_uid.to_0x_hex()] = (
+            protocol_fee_token.to_0x_hex(),
+            protocol_fee_amount,
+        )
         # network fees
         surplus_fee = trade.compute_surplus_fee()  # in the surplus token
         network_fee = surplus_fee - protocol_fee_amount
@@ -460,7 +463,10 @@ def compute_fee_imbalances(
         else:
             network_fee_sell = network_fee
 
-        network_fees[trade.sell_token.to_0x_hex()] = network_fee_sell
+        network_fees[trade.order_uid.to_0x_hex()] = (
+            trade.sell_token.to_0x_hex(),
+            network_fee_sell,
+        )
 
     return protocol_fees, network_fees
 
@@ -475,3 +481,11 @@ def batch_fee_imbalances(
     settlement_data = orderbook_api.get_all_data(tx_hash)
     protocol_fees, network_fees = compute_fee_imbalances(settlement_data)
     return protocol_fees, network_fees
+
+
+if __name__ == "__main__":
+    tx_hash = HexBytes(
+        "0xbd8cf4a21ad811cc3b9e49cff5e95563c3c2651b0ea41e0f8a7987818205c984"
+    )
+    protocol_fees, network_fees = batch_fee_imbalances(tx_hash)
+    print(protocol_fees)
