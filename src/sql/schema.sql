@@ -7,7 +7,8 @@ CREATE TABLE raw_token_imbalances (
     block_number BIGINT NOT NULL,
     tx_hash BYTEA NOT NULL,
     token_address BYTEA NOT NULL,
-    imbalance NUMERIC(78,0)
+    imbalance NUMERIC(78,0),
+    PRIMARY KEY (tx_hash, token_address)
 );
 
 -- Table: slippage_prices (for storing per unit token prices in ETH)
