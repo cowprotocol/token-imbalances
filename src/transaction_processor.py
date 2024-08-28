@@ -163,7 +163,7 @@ class TransactionProcessor:
 
     def process_fees_for_transaction(
         self, tx_hash: str, auction_id: int, block_number: int
-    ) -> tuple[dict[str, int], dict[str, int]]:
+    ) -> tuple[dict[str, tuple[str, int]], dict[str, tuple[str, int]]]:
         """Process and return protocol and network fees for a given transaction."""
         try:
             protocol_fees, network_fees = batch_fee_imbalances(HexBytes(tx_hash))
@@ -175,8 +175,8 @@ class TransactionProcessor:
     def process_prices_for_tokens(
         self,
         token_imbalances: dict[str, int],
-        protocol_fees: dict[str, int],
-        network_fees: dict[str, int],
+        protocol_fees: dict[str, tuple[str, int]],
+        network_fees: dict[str, tuple[str, int]],
         block_number: int,
         tx_hash: str,
     ) -> dict[str, tuple[float, str]]:
