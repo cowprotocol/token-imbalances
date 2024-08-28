@@ -10,6 +10,6 @@ FROM (
     WHERE chain_name = :chain_name
     UNION ALL
     SELECT MAX(block_number) AS max_block_number 
-    FROM fees
+    FROM fees_new
     WHERE chain_name = :chain_name
 ) AS max_blocks;
