@@ -22,14 +22,15 @@ CREATE TABLE slippage_prices (
 );
 
 -- Table: Stores fees (i.e. protocol fee, network fee on per token basis)
-CREATE TABLE fees (
+CREATE TABLE fees_new (
     chain_name VARCHAR(50) NOT NULL,
     auction_id BIGINT NOT NULL,
     block_number BIGINT NOT NULL,
     tx_hash BYTEA NOT NULL,
+    order_uid BYTEA NOT NULL,
     token_address BYTEA NOT NULL,
     fee_amount NUMERIC(78,0) NOT NULL,
     fee_type VARCHAR(50) NOT NULL, -- e.g. "protocol" or "network"
-    PRIMARY KEY (tx_hash, token_address)
+    PRIMARY KEY (tx_hash, order_uid, token_address, fee_type)
 );
 

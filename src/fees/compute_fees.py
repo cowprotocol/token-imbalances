@@ -439,9 +439,9 @@ class OrderbookFetcher:
 # computing fees
 def compute_fee_imbalances(
     settlement_data: SettlementData,
-) -> tuple[dict[str, int], dict[str, int]]:
-    protocol_fees: dict[str, int] = {}
-    network_fees: dict[str, int] = {}
+) -> tuple[dict[str, tuple[str, int]], dict[str, tuple[str, int]]]:
+    protocol_fees: dict[str, tuple[str, int]] = {}
+    network_fees: dict[str, tuple[str, int]] = {}
     for trade in settlement_data.trades:
         # protocol fees
         protocol_fee_amount = trade.protocol_fee()
@@ -476,16 +476,8 @@ def compute_fee_imbalances(
 
 def batch_fee_imbalances(
     tx_hash: HexBytes,
-) -> tuple[dict[str, int], dict[str, int]]:
+) -> tuple[dict[str, tuple[str, int]], dict[str, tuple[str, int]]]:
     orderbook_api = OrderbookFetcher()
     settlement_data = orderbook_api.get_all_data(tx_hash)
     protocol_fees, network_fees = compute_fee_imbalances(settlement_data)
     return protocol_fees, network_fees
-
-
-if __name__ == "__main__":
-    tx_hash = HexBytes(
-        "0xbd8cf4a21ad811cc3b9e49cff5e95563c3c2651b0ea41e0f8a7987818205c984"
-    )
-    protocol_fees, network_fees = batch_fee_imbalances(tx_hash)
-    print(protocol_fees)

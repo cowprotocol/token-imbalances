@@ -104,6 +104,7 @@ class Database:
         auction_id: int,
         block_number: int,
         tx_hash: str,
+        order_uid: str,
         token_address: str,
         fee_amount: float,
         fee_type: str,
@@ -111,7 +112,7 @@ class Database:
         """Function attempts to write price data to the table."""
         tx_hash_bytes = bytes.fromhex(tx_hash[2:])
         token_address_bytes = bytes.fromhex(token_address[2:])
-
+        order_uid_bytes = bytes.fromhex(order_uid[2:])
         query = read_sql_file("src/sql/insert_fee.sql")
         self.execute_and_commit(
             query,
@@ -120,6 +121,7 @@ class Database:
                 "auction_id": auction_id,
                 "block_number": block_number,
                 "tx_hash": tx_hash_bytes,
+                "order_uid": order_uid_bytes,
                 "token_address": token_address_bytes,
                 "fee_amount": fee_amount,
                 "fee_type": fee_type,

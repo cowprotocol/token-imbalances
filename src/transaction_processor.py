@@ -122,7 +122,12 @@ class TransactionProcessor:
         logger.info("\n".join(log_message))
 
     def handle_fees(
-        self, protocol_fees, network_fees, auction_id, block_number, tx_hash
+        self,
+        protocol_fees: dict[str, tuple[str, int]],
+        network_fees: dict[str, tuple[str, int]],
+        auction_id: int,
+        block_number: int,
+        tx_hash: str,
     ):
         """This function loops over (token, fee) and calls write_fees to write to table."""
         # Write protocol fees
@@ -132,6 +137,7 @@ class TransactionProcessor:
                 auction_id=auction_id,
                 block_number=block_number,
                 tx_hash=tx_hash,
+                order_uid=order_uid,
                 token_address=token_address,
                 fee_amount=float(fee_amount),
                 fee_type="protocol",
@@ -144,6 +150,7 @@ class TransactionProcessor:
                 auction_id=auction_id,
                 block_number=block_number,
                 tx_hash=tx_hash,
+                order_uid=order_uid,
                 token_address=token_address,
                 fee_amount=float(fee_amount),
                 fee_type="network",
@@ -172,7 +179,7 @@ def calculate_slippage(
         for order_uid, (token_address, fee_amount) in network_fees.items()
     }
 
-    # Set of all tokens from all three dicts
+    # To find all tokens for which we need a price -> set of tokens from all dicts
     all_tokens = (
         set(token_imbalances.keys())
         .union([token_address for token_address, _ in protocol_fees.values()])
@@ -194,6 +201,7 @@ def calculate_slippage(
             for _, (token_address, fee_amount) in network_fees.items()
             if token_address == token
         )
+        # for a final slippage per token per tx basis
         total = imbalance - protocol_fee - network_fee
         slippage[token] = total
 
