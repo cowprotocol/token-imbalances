@@ -153,10 +153,10 @@ class CoingeckoPriceProvider(AbstractPriceProvider):
                 token_id, block_start_timestamp, block_end_timestamp
             )
             if api_price is None:
-                logger.warning(f"API returned None for token ID: {token_id}")
+                logger.warning(f"Coingecko API returned None for token ID: {token_id}")
                 return None
         except requests.RequestException as e:
-            logger.error(f"Error fetching price from API: {e}")
+            logger.error(f"Error fetching price from Coingecko API: {e}")
             return None
 
         return api_price

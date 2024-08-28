@@ -11,4 +11,5 @@ AND block_number >= :block_number;
 DELETE FROM fees_new
 WHERE chain_name = :chain_name
 AND block_number >= :block_number;
+
 COMMIT;
