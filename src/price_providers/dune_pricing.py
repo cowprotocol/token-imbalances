@@ -70,6 +70,7 @@ class DunePriceProvider(AbstractPriceProvider):
                 if price is not None:
                     return price
             # No valid price found
+            self.logger.warning("Price not found on Dune.")
             return None
         except KeyError as e:
             self.logger.error(f"Key error occurred: {e}")
