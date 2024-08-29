@@ -29,4 +29,6 @@ jobs:
         env:
           MORALIS_API_KEY: ${{ secrets.MORALIS_API_KEY }}
           CHAIN_SLEEP_TIME: ${{ secrets.CHAIN_SLEEP_TIME }}
+          NODE_URL: ${{ secrets.NODE_URL }}
+          CHAIN_NAME: ${{ secrets.CHAIN_NAME }}
         run: pytest
