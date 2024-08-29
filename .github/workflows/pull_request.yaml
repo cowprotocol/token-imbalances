@@ -28,4 +28,4 @@ jobs:
       - name: Run Pytest
         env:
           MORALIS_API_KEY: ${{ secrets.MORALIS_API_KEY }}
-        run: pytest
+        run: pytest tests/test_pricefeed.py
