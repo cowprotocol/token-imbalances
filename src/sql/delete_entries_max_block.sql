@@ -8,7 +8,7 @@ DELETE FROM slippage_prices
 WHERE chain_name = :chain_name
 AND block_number >= :block_number;
 
-DELETE FROM fees
+DELETE FROM fees_new
 WHERE chain_name = :chain_name
 AND block_number >= :block_number;
 

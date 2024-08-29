@@ -163,7 +163,7 @@ class TransactionProcessor:
 
     def process_fees_for_transaction(
         self, tx_hash: str, auction_id: int, block_number: int
-    ) -> tuple[dict[str, int], dict[str, int]]:
+    ) -> tuple[dict[str, tuple[str, int]], dict[str, tuple[str, int]]]:
         """Process and return protocol and network fees for a given transaction."""
         try:
             protocol_fees, network_fees = batch_fee_imbalances(HexBytes(tx_hash))
@@ -175,8 +175,8 @@ class TransactionProcessor:
     def process_prices_for_tokens(
         self,
         token_imbalances: dict[str, int],
-        protocol_fees: dict[str, int],
-        network_fees: dict[str, int],
+        protocol_fees: dict[str, tuple[str, int]],
+        network_fees: dict[str, tuple[str, int]],
         block_number: int,
         tx_hash: str,
     ) -> dict[str, tuple[float, str]]:
@@ -223,40 +223,42 @@ class TransactionProcessor:
 
     def handle_fees(
         self,
-        protocol_fees: dict[str, int],
-        network_fees: dict[str, int],
+        protocol_fees: dict[str, tuple[str, int]],
+        network_fees: dict[str, tuple[str, int]],
         auction_id: int,
         block_number: int,
         tx_hash: str,
-    ) -> None:
+    ):
         """This function loops over (token, fee) and calls write_fees to write to table."""
         try:
             # Write protocol fees
-            for token_address, fee_amount in protocol_fees.items():
+            for order_uid, (token_address, fee_amount) in protocol_fees.items():
                 self.db.write_fees(
                     chain_name=self.chain_name,
                     auction_id=auction_id,
                     block_number=block_number,
                     tx_hash=tx_hash,
+                    order_uid=order_uid,
                     token_address=token_address,
                     fee_amount=float(fee_amount),
                     fee_type="protocol",
                 )
 
             # Write network fees
-            for token_address, fee_amount in network_fees.items():
+            for order_uid, (token_address, fee_amount) in network_fees.items():
                 self.db.write_fees(
                     chain_name=self.chain_name,
                     auction_id=auction_id,
                     block_number=block_number,
                     tx_hash=tx_hash,
+                    order_uid=order_uid,
                     token_address=token_address,
                     fee_amount=float(fee_amount),
                     fee_type="network",
                 )
-        except Exception as e:
+        except Exception as err:
             logger.error(
-                f"Failed to write fees to database for transaction {tx_hash}: {e}"
+                f"Failed to write fees to database for transaction {tx_hash}: {err}"
             )
 
     def handle_prices(
@@ -275,28 +277,31 @@ class TransactionProcessor:
 
 def calculate_slippage(
     token_imbalances: dict[str, int],
-    protocol_fees: dict[str, int],
-    network_fees: dict[str, int],
+    protocol_fees: dict[str, tuple[str, int]],
+    network_fees: dict[str, tuple[str, int]],
 ) -> dict[str, int]:
     """Function calculates net slippage for each token per tx."""
 
-    # Perform checksum on all keys
+    # checksum on token addresses
     token_imbalances = {
         Web3.to_checksum_address(token): value
         for token, value in token_imbalances.items()
     }
     protocol_fees = {
-        Web3.to_checksum_address(token): value for token, value in protocol_fees.items()
-    }
-    network_fees = {
-        Web3.to_checksum_address(token): value for token, value in network_fees.items()
+        order_uid: (Web3.to_checksum_address(token_address), fee_amount)
+        for order_uid, (token_address, fee_amount) in protocol_fees.items()
     }
 
-    # Set of all tokens from all three dicts
+    network_fees = {
+        order_uid: (Web3.to_checksum_address(token_address), fee_amount)
+        for order_uid, (token_address, fee_amount) in network_fees.items()
+    }
+
+    # To find all tokens for which we need a price -> set of tokens from all dicts
     all_tokens = (
         set(token_imbalances.keys())
-        .union(protocol_fees.keys())
-        .union(network_fees.keys())
+        .union([token_address for token_address, _ in protocol_fees.values()])
+        .union([token_address for token_address, _ in network_fees.values()])
     )
 
     slippage = {}
@@ -304,9 +309,17 @@ def calculate_slippage(
     # calculate net slippage per token
     for token in all_tokens:
         imbalance = token_imbalances.get(token, 0)
-        protocol_fee = protocol_fees.get(token, 0)
-        network_fee = network_fees.get(token, 0)
-
+        protocol_fee = sum(
+            fee_amount
+            for _, (token_address, fee_amount) in protocol_fees.items()
+            if token_address == token
+        )
+        network_fee = sum(
+            fee_amount
+            for _, (token_address, fee_amount) in network_fees.items()
+            if token_address == token
+        )
+        # for a final slippage per token per tx basis
         total = imbalance - protocol_fee - network_fee
         slippage[token] = total
 
