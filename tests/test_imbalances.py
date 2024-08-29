@@ -53,7 +53,7 @@ def test_imbalances(tx_hash, expected_imbalances):
     Asserts imbalances match for main script with test values provided.
     """
     chain_name = os.getenv("CHAIN_NAME")
-    rt = RawTokenImbalances(get_web3_instance(), chain_name)
-    imbalances = rt.compute_imbalances(tx_hash)
+    compute = RawTokenImbalances(get_web3_instance(), chain_name)
+    imbalances = compute.compute_imbalances(tx_hash)
     for token_address, expected_imbalance in expected_imbalances.items():
         assert imbalances.get(token_address) == expected_imbalance

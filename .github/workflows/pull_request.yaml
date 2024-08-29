@@ -29,4 +29,4 @@ jobs:
         env:
           MORALIS_API_KEY: ${{ secrets.MORALIS_API_KEY }}
           CHAIN_SLEEP_TIME: ${{ secrets.CHAIN_SLEEP_TIME }}
-        run: pytest tests/test_pricefeed.py
+        run: pytest
