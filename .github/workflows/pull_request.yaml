@@ -25,3 +25,7 @@ jobs:
           black --check ./
       - name: Type Check (mypy)
         run: mypy src
+      - name: Run Pytest
+        env:
+          MORALIS_API_KEY: ${{ secrets.MORALIS_API_KEY }}
+        run: pytest
