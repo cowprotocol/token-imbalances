@@ -504,7 +504,7 @@ def compute_fee_imbalances(
             trade.network_fee,
         )
 
-    return protocol_fees, network_fees, partner_fees
+    return protocol_fees, network_fees
 
 
 # combined function
@@ -515,5 +515,5 @@ def batch_fee_imbalances(
 ) -> tuple[dict[str, tuple[str, int]], dict[str, tuple[str, int]]]:
     orderbook_api = OrderbookFetcher()
     settlement_data = orderbook_api.get_all_data(tx_hash)
-    protocol_fees, network_fees, partner_fees = compute_fee_imbalances(settlement_data)
-    return protocol_fees, network_fees, partner_fees
+    protocol_fees, network_fees = compute_fee_imbalances(settlement_data)
+    return protocol_fees, network_fees
