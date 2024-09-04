@@ -5,14 +5,14 @@ from fractions import Fraction
 import math
 import os
 from typing import Any
+import requests
+import json
 from dotenv import load_dotenv
 from eth_typing import ChecksumAddress
 from hexbytes import HexBytes
 from web3 import Web3
 
 from src.constants import REQUEST_TIMEOUT, NULL_ADDRESS
-import requests
-import json
 
 # types for trades
 
