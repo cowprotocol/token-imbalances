@@ -89,7 +89,7 @@ class Trade:
         i = 0
         self.protocol_fee = 0
         self.partner_fee = 0
-        if self.fee_policies != []:
+        if self.fee_policies:
             for fee_policy in reversed(self.fee_policies):
                 raw_trade = fee_policy.reverse_protocol_fee(raw_trade)
                 ## we assume that partner fee is the last to be applied
