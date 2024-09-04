@@ -53,17 +53,6 @@ class Trade:
         self.partner_fee: int = -1
 
         self.compute_all_fees()
-        surplus_fee = self.compute_surplus_fee()  # in the surplus token
-        network_fee_temp = surplus_fee - (self.protocol_fee + self.partner_fee)
-        if self.kind == "sell":
-            self.network_fee = int(
-                network_fee_temp
-                * Fraction(
-                    self.buy_token_clearing_price, self.sell_token_clearing_price
-                )
-            )
-        else:
-            self.network_fee = network_fee_temp
         return
 
     def volume(self) -> int:
@@ -109,6 +98,17 @@ class Trade:
                 i = i + 1
             self.protocol_fee = raw_trade.surplus() - self.surplus() - self.partner_fee
 
+        surplus_fee = self.compute_surplus_fee()  # in the surplus token
+        network_fee_temp = surplus_fee - (self.protocol_fee + self.partner_fee)
+        if self.kind == "sell":
+            self.network_fee = int(
+                network_fee_temp
+                * Fraction(
+                    self.buy_token_clearing_price, self.sell_token_clearing_price
+                )
+            )
+        else:
+            self.network_fee = network_fee_temp
         return
 
     def total_protocol_fee(self):
