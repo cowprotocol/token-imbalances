@@ -6,7 +6,7 @@ import math
 import os
 from typing import Any
 from dotenv import load_dotenv
-from eth_typing import Address
+from eth_typing import ChecksumAddress
 from hexbytes import HexBytes
 
 from src.constants import REQUEST_TIMEOUT, NULL_ADDRESS
@@ -31,7 +31,7 @@ class Trade:
     sell_token_clearing_price: int
     buy_token_clearing_price: int
     fee_policies: list["FeePolicy"]
-    partner_fee_recipient: HexBytes  # if there is no partner, then its value is set to the null address
+    partner_fee_recipient: ChecksumAddress  # if there is no partner, then its value is set to the null address
     network_fee: int
     protocol_fee: int
     partner_fee: int
@@ -81,10 +81,10 @@ class Trade:
             if i == 0 and self.partner_fee_recipient is not NULL_ADDRESS:
                 self.partner_fee = raw_trade.surplus() - self.surplus()
             i = i + 1
-        self.protocol_fee = raw_trade.surplus() - self.surplus() - self.partner_fee()
+        self.protocol_fee = raw_trade.surplus() - self.surplus() - self.partner_fee
         return raw_trade.surplus()
 
-    def protocol_fee(self):
+    def total_protocol_fee(self):
         """Compute protocol fees of a trade in the surplus token
         Protocol fees are computed as the difference of raw surplus and surplus."""
 
@@ -469,7 +469,7 @@ def compute_fee_imbalances(
     network_fees: dict[str, tuple[str, int]] = {}
     for trade in settlement_data.trades:
         # protocol fees
-        protocol_fee_amount = trade.protocol_fee()
+        protocol_fee_amount = trade.total_protocol_fee()
         protocol_fee_token = trade.surplus_token()
         protocol_fees[trade.order_uid.to_0x_hex()] = (
             protocol_fee_token.to_0x_hex(),
