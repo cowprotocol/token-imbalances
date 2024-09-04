@@ -86,16 +86,14 @@ class Trade:
 
     def compute_all_fees(self) -> None:
         raw_trade = deepcopy(self)
-        i = 0
         self.total_protocol_fee = 0
         self.partner_fee = 0
         if self.fee_policies:
-            for fee_policy in reversed(self.fee_policies):
+            for i, fee_policy in enumerate(reversed(self.fee_policies)):
                 raw_trade = fee_policy.reverse_protocol_fee(raw_trade)
                 ## we assume that partner fee is the last to be applied
                 if i == 0 and self.partner_fee_recipient is not NULL_ADDRESS:
                     self.partner_fee = raw_trade.surplus() - self.surplus()
-                i = i + 1
             self.total_protocol_fee = raw_trade.surplus() - self.surplus()
 
         surplus_fee = self.compute_surplus_fee()  # in the surplus token
