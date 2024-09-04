@@ -8,6 +8,7 @@ from typing import Any
 from dotenv import load_dotenv
 from eth_typing import ChecksumAddress
 from hexbytes import HexBytes
+from web3 import Web3
 
 from src.constants import REQUEST_TIMEOUT, NULL_ADDRESS
 import requests
@@ -351,8 +352,8 @@ class OrderbookFetcher:
 
             app_data = json.loads(order_data["fullAppData"])
             if "partnerFee" in app_data["metadata"].keys():
-                partner_fee_recipient = HexBytes(
-                    app_data["metadata"]["partnerFee"]["recipient"]
+                partner_fee_recipient = Web3.to_checksum_address(
+                    HexBytes(app_data["metadata"]["partnerFee"]["recipient"])
                 )
             else:
                 partner_fee_recipient = NULL_ADDRESS
