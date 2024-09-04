@@ -21,21 +21,49 @@ import json
 class Trade:
     """Class for"""
 
-    order_uid: HexBytes
-    sell_amount: int
-    buy_amount: int
-    sell_token: HexBytes
-    buy_token: HexBytes
-    limit_sell_amount: int
-    limit_buy_amount: int
-    kind: str
-    sell_token_clearing_price: int
-    buy_token_clearing_price: int
-    fee_policies: list["FeePolicy"]
-    partner_fee_recipient: ChecksumAddress  # if there is no partner, then its value is set to the null address
-    network_fee: int
-    protocol_fee: int
-    partner_fee: int
+    def __init__(
+        self,
+        order_uid: HexBytes,
+        sell_amount: int,
+        buy_amount: int,
+        sell_token: HexBytes,
+        buy_token: HexBytes,
+        limit_sell_amount: int,
+        limit_buy_amount: int,
+        kind: str,
+        sell_token_clearing_price: int,
+        buy_token_clearing_price: int,
+        fee_policies: list["FeePolicy"],
+        partner_fee_recipient: ChecksumAddress,
+    ):
+        self.order_uid = order_uid
+        self.sell_amount = sell_amount
+        self.buy_amount = buy_amount
+        self.sell_token = sell_token
+        self.buy_token = buy_token
+        self.limit_sell_amount = limit_sell_amount
+        self.limit_buy_amount = limit_buy_amount
+        self.kind = kind
+        self.sell_token_clearing_price = sell_token_clearing_price
+        self.buy_token_clearing_price = buy_token_clearing_price
+        self.fee_policies = fee_policies
+        self.partner_fee_recipient = partner_fee_recipient  # if there is no partner, then its value is set to the null address
+        self.network_fee: int = -1
+        self.protocol_fee: int = -1
+        self.partner_fee: int = -1
+
+        self.compute_all_fees()
+        surplus_fee = self.compute_surplus_fee()  # in the surplus token
+        network_fee_temp = surplus_fee - (self.protocol_fee + self.partner_fee)
+        if self.kind == "sell":
+            self.network_fee = int(
+                network_fee_temp
+                * Fraction(
+                    self.buy_token_clearing_price, self.sell_token_clearing_price
+                )
+            )
+        else:
+            self.network_fee = network_fee_temp
 
     def volume(self) -> int:
         """Compute volume of a trade in the surplus token"""
@@ -66,30 +94,27 @@ class Trade:
             return current_limit_sell_amount - self.sell_amount
         raise ValueError(f"Order kind {self.kind} is invalid.")
 
-    def raw_surplus(self) -> int:
-        """Compute raw surplus of a trade in the surplus token
-        First, the application of protocol fees is reversed. Then, surplus of the resulting trade
-        is computed."""
+    def compute_all_fees(self) -> None:
         raw_trade = deepcopy(self)
         i = 0
         self.protocol_fee = 0
         self.partner_fee = 0
-        if self.fee_policies == []:
-            return self.surplus()
-        for fee_policy in reversed(self.fee_policies):
-            raw_trade = fee_policy.reverse_protocol_fee(raw_trade)
-            ## we assume that partner fee is the last to be applied
-            if i == 0 and self.partner_fee_recipient is not NULL_ADDRESS:
-                self.partner_fee = raw_trade.surplus() - self.surplus()
-            i = i + 1
-        self.protocol_fee = raw_trade.surplus() - self.surplus() - self.partner_fee
-        return raw_trade.surplus()
+        if self.fee_policies != []:
+            for fee_policy in reversed(self.fee_policies):
+                raw_trade = fee_policy.reverse_protocol_fee(raw_trade)
+                ## we assume that partner fee is the last to be applied
+                if i == 0 and self.partner_fee_recipient is not NULL_ADDRESS:
+                    self.partner_fee = raw_trade.surplus() - self.surplus()
+                i = i + 1
+            self.protocol_fee = raw_trade.surplus() - self.surplus() - self.partner_fee
+
+        return
 
     def total_protocol_fee(self):
         """Compute protocol fees of a trade in the surplus token
         Protocol fees are computed as the difference of raw surplus and surplus."""
 
-        return self.raw_surplus() - self.surplus()
+        return self.protocol_fee + self.partner_fee
 
     def surplus_token(self) -> HexBytes:
         """Returns the surplus token"""
@@ -371,9 +396,6 @@ class OrderbookFetcher:
                 buy_token_clearing_price=buy_token_clearing_price,
                 fee_policies=fee_policies,
                 partner_fee_recipient=partner_fee_recipient,
-                network_fee=-1,  # this is to signal the entry is not yet computed
-                protocol_fee=-1,  # this is to signal the entry is not yet computed
-                partner_fee=-1,  # this is to signal the entry is not yet computed
             )
             trades.append(trade)
 
@@ -468,33 +490,21 @@ def compute_fee_imbalances(
 ) -> tuple[dict[str, tuple[str, int]], dict[str, tuple[str, int]]]:
     protocol_fees: dict[str, tuple[str, int]] = {}
     network_fees: dict[str, tuple[str, int]] = {}
+    partner_fees = 0
     for trade in settlement_data.trades:
         # protocol fees
-        protocol_fee_amount = trade.total_protocol_fee()
+        protocol_fee_amount = trade.protocol_fee
         protocol_fee_token = trade.surplus_token()
         protocol_fees[trade.order_uid.to_0x_hex()] = (
             protocol_fee_token.to_0x_hex(),
             protocol_fee_amount,
         )
-        # network fees
-        surplus_fee = trade.compute_surplus_fee()  # in the surplus token
-        network_fee = surplus_fee - protocol_fee_amount
-        if trade.kind == "sell":
-            network_fee_sell = int(
-                network_fee
-                * Fraction(
-                    trade.buy_token_clearing_price, trade.sell_token_clearing_price
-                )
-            )
-        else:
-            network_fee_sell = network_fee
-        trade.network_fee = network_fee_sell
         network_fees[trade.order_uid.to_0x_hex()] = (
             trade.sell_token.to_0x_hex(),
-            network_fee_sell,
+            trade.network_fee,
         )
 
-    return protocol_fees, network_fees
+    return protocol_fees, network_fees, partner_fees
 
 
 # combined function
@@ -505,5 +515,5 @@ def batch_fee_imbalances(
 ) -> tuple[dict[str, tuple[str, int]], dict[str, tuple[str, int]]]:
     orderbook_api = OrderbookFetcher()
     settlement_data = orderbook_api.get_all_data(tx_hash)
-    protocol_fees, network_fees = compute_fee_imbalances(settlement_data)
-    return protocol_fees, network_fees
+    protocol_fees, network_fees, partner_fees = compute_fee_imbalances(settlement_data)
+    return protocol_fees, network_fees, partner_fees
