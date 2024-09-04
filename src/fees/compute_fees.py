@@ -49,7 +49,7 @@ class Trade:
         self.fee_policies = fee_policies
         self.partner_fee_recipient = partner_fee_recipient  # if there is no partner, then its value is set to the null address
         self.network_fee: int = -1
-        self.protocol_fee: int = -1
+        self.total_protocol_fee: int = -1
         self.partner_fee: int = -1
 
         self.compute_all_fees()
@@ -87,7 +87,7 @@ class Trade:
     def compute_all_fees(self) -> None:
         raw_trade = deepcopy(self)
         i = 0
-        self.protocol_fee = 0
+        self.total_protocol_fee = 0
         self.partner_fee = 0
         if self.fee_policies:
             for fee_policy in reversed(self.fee_policies):
@@ -96,10 +96,10 @@ class Trade:
                 if i == 0 and self.partner_fee_recipient is not NULL_ADDRESS:
                     self.partner_fee = raw_trade.surplus() - self.surplus()
                 i = i + 1
-            self.protocol_fee = raw_trade.surplus() - self.surplus() - self.partner_fee
+            self.total_protocol_fee = raw_trade.surplus() - self.surplus()
 
         surplus_fee = self.compute_surplus_fee()  # in the surplus token
-        network_fee_temp = surplus_fee - (self.protocol_fee + self.partner_fee)
+        network_fee_temp = surplus_fee - self.total_protocol_fee
         if self.kind == "sell":
             self.network_fee = int(
                 network_fee_temp
@@ -110,12 +110,6 @@ class Trade:
         else:
             self.network_fee = network_fee_temp
         return
-
-    def total_protocol_fee(self):
-        """Compute protocol fees of a trade in the surplus token
-        Protocol fees are computed as the difference of raw surplus and surplus."""
-
-        return self.protocol_fee + self.partner_fee
 
     def surplus_token(self) -> HexBytes:
         """Returns the surplus token"""
@@ -493,7 +487,7 @@ def compute_fee_imbalances(
     network_fees: dict[str, tuple[str, int]] = {}
     for trade in settlement_data.trades:
         # protocol fees
-        protocol_fee_amount = trade.protocol_fee
+        protocol_fee_amount = trade.total_protocol_fee
         protocol_fee_token = trade.surplus_token()
         protocol_fees[trade.order_uid.to_0x_hex()] = (
             protocol_fee_token.to_0x_hex(),
