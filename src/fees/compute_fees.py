@@ -11,8 +11,10 @@ from hexbytes import HexBytes
 
 from src.constants import (
     REQUEST_TIMEOUT,
+    NULL_ADDRESS
 )
 import requests
+import json
 
 # types for trades
 
@@ -32,6 +34,10 @@ class Trade:
     sell_token_clearing_price: int
     buy_token_clearing_price: int
     fee_policies: list["FeePolicy"]
+    partner_fee_recipient: HexBytes # if there is no partner, then its value is set to the null address
+    network_fee: int
+    protocol_fee: int
+    partner_fee: int
 
     def volume(self) -> int:
         """Compute volume of a trade in the surplus token"""
@@ -67,8 +73,14 @@ class Trade:
         First, the application of protocol fees is reversed. Then, surplus of the resulting trade
         is computed."""
         raw_trade = deepcopy(self)
+        i = 0
         for fee_policy in reversed(self.fee_policies):
             raw_trade = fee_policy.reverse_protocol_fee(raw_trade)
+            ## we assume that partner fee is the last to be applied
+            if i == 0 and self.partner_fee_recipient is not NULL_ADDRESS:
+                self.partner_fee = raw_trade.surplus() - self.surplus()
+            i = i + 1
+        self.protocol_fee = raw_trade.surplus() - self.surplus() - self.partner_fee()
         return raw_trade.surplus()
 
     def protocol_fee(self):
@@ -336,6 +348,12 @@ class OrderbookFetcher:
             buy_token_clearing_price = clearing_prices[buy_token]
             fee_policies = self.parse_fee_policies(trade_data["feePolicies"])
 
+            app_data = json.loads(order_data['fullAppData'])
+            if 'partnerFee' in app_data['metadata'].keys():
+                partner_fee_recipient = HexBytes(app_data['metadata']['partnerFee']['recipient'])
+            else:
+                partner_fee_recipient = NULL_ADDRESS
+
             trade = Trade(
                 order_uid=uid,
                 sell_amount=executed_sell_amount,
@@ -348,6 +366,10 @@ class OrderbookFetcher:
                 sell_token_clearing_price=sell_token_clearing_price,
                 buy_token_clearing_price=buy_token_clearing_price,
                 fee_policies=fee_policies,
+                partner_fee_recipient=partner_fee_recipient,
+                network_fee=0,
+                protocol_fee=0,
+                partner_fee=0
             )
             trades.append(trade)
 
