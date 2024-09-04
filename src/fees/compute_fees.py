@@ -64,6 +64,7 @@ class Trade:
             )
         else:
             self.network_fee = network_fee_temp
+        return
 
     def volume(self) -> int:
         """Compute volume of a trade in the surplus token"""
