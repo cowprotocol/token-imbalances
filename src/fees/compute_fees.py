@@ -491,7 +491,6 @@ def compute_fee_imbalances(
 ) -> tuple[dict[str, tuple[str, int]], dict[str, tuple[str, int]]]:
     protocol_fees: dict[str, tuple[str, int]] = {}
     network_fees: dict[str, tuple[str, int]] = {}
-    partner_fees = 0
     for trade in settlement_data.trades:
         # protocol fees
         protocol_fee_amount = trade.protocol_fee
