@@ -9,10 +9,7 @@ from dotenv import load_dotenv
 from eth_typing import Address
 from hexbytes import HexBytes
 
-from src.constants import (
-    REQUEST_TIMEOUT,
-    NULL_ADDRESS
-)
+from src.constants import REQUEST_TIMEOUT, NULL_ADDRESS
 import requests
 import json
 
@@ -34,7 +31,7 @@ class Trade:
     sell_token_clearing_price: int
     buy_token_clearing_price: int
     fee_policies: list["FeePolicy"]
-    partner_fee_recipient: HexBytes # if there is no partner, then its value is set to the null address
+    partner_fee_recipient: HexBytes  # if there is no partner, then its value is set to the null address
     network_fee: int
     protocol_fee: int
     partner_fee: int
@@ -74,6 +71,10 @@ class Trade:
         is computed."""
         raw_trade = deepcopy(self)
         i = 0
+        self.protocol_fee = 0
+        self.partner_fee = 0
+        if self.fee_policies == []:
+            return self.surplus()
         for fee_policy in reversed(self.fee_policies):
             raw_trade = fee_policy.reverse_protocol_fee(raw_trade)
             ## we assume that partner fee is the last to be applied
@@ -348,9 +349,11 @@ class OrderbookFetcher:
             buy_token_clearing_price = clearing_prices[buy_token]
             fee_policies = self.parse_fee_policies(trade_data["feePolicies"])
 
-            app_data = json.loads(order_data['fullAppData'])
-            if 'partnerFee' in app_data['metadata'].keys():
-                partner_fee_recipient = HexBytes(app_data['metadata']['partnerFee']['recipient'])
+            app_data = json.loads(order_data["fullAppData"])
+            if "partnerFee" in app_data["metadata"].keys():
+                partner_fee_recipient = HexBytes(
+                    app_data["metadata"]["partnerFee"]["recipient"]
+                )
             else:
                 partner_fee_recipient = NULL_ADDRESS
 
@@ -367,9 +370,9 @@ class OrderbookFetcher:
                 buy_token_clearing_price=buy_token_clearing_price,
                 fee_policies=fee_policies,
                 partner_fee_recipient=partner_fee_recipient,
-                network_fee=0,
-                protocol_fee=0,
-                partner_fee=0
+                network_fee=-1,  # this is to signal the entry is not yet computed
+                protocol_fee=-1,  # this is to signal the entry is not yet computed
+                partner_fee=-1,  # this is to signal the entry is not yet computed
             )
             trades.append(trade)
 
@@ -484,7 +487,7 @@ def compute_fee_imbalances(
             )
         else:
             network_fee_sell = network_fee
-
+        trade.network_fee = network_fee_sell
         network_fees[trade.order_uid.to_0x_hex()] = (
             trade.sell_token.to_0x_hex(),
             network_fee_sell,
