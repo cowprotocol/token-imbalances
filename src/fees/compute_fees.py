@@ -90,7 +90,7 @@ class Trade:
 
     def compute_all_fees(self) -> tuple[int, int, int]:
         raw_trade = deepcopy(self)
-        total_protocol_fee = 0
+        partner_fee = 0
         for i, fee_policy in enumerate(reversed(self.fee_policies)):
             raw_trade = fee_policy.reverse_protocol_fee(raw_trade)
             ## we assume that partner fee is the last to be applied
