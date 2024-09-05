@@ -89,7 +89,6 @@ class Database:
 
     def write_fees(
         self,
-        chain_name: str,
         auction_id: int,
         block_number: int,
         tx_hash: str,
@@ -112,7 +111,7 @@ class Database:
         self.execute_and_commit(
             query,
             {
-                "chain_name": chain_name,
+                "chain_name": self.chain_name,
                 "auction_id": auction_id,
                 "block_number": block_number,
                 "tx_hash": tx_hash_bytes,
