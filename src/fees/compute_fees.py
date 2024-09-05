@@ -482,7 +482,11 @@ class OrderbookFetcher:
 # Note that currently it is NOT working for CoW AMMs as they are not indexed.
 def compute_all_fees_of_batch(
     tx_hash: HexBytes,
-) -> tuple[dict[str, tuple[str, int]], dict[str, tuple[str, int]]]:
+) -> tuple[
+    dict[str, tuple[str, int]],
+    dict[str, tuple[str, int, str]],
+    dict[str, tuple[str, int]],
+]:
     orderbook_api = OrderbookFetcher()
     settlement_data = orderbook_api.get_all_data(tx_hash)
     protocol_fees: dict[str, tuple[str, int]] = {}
