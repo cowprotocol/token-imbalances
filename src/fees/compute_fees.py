@@ -19,7 +19,11 @@ from src.constants import REQUEST_TIMEOUT, NULL_ADDRESS
 
 @dataclass
 class Trade:
-    """Class for"""
+    """Class for describing a trade, together with the fees associated with it.
+    We note that we use the NULL address to indicate that there are no partner fees.
+    Note that in case an order is placed with the partner fee recipient being the null address,
+    the partner fee will instead be accounted for as protocol fee and will be withheld by the DAO.
+    """
 
     def __init__(
         self,
