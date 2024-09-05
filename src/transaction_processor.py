@@ -249,7 +249,6 @@ class TransactionProcessor:
             # Write protocol fees
             for order_uid, (token_address, fee_amount) in protocol_fees.items():
                 self.db.write_fees(
-                    chain_name=self.chain_name,
                     auction_id=auction_id,
                     block_number=block_number,
                     tx_hash=tx_hash,
@@ -267,7 +266,6 @@ class TransactionProcessor:
                 recipient,
             ) in partner_fees.items():
                 self.db.write_fees(
-                    chain_name=self.chain_name,
                     auction_id=auction_id,
                     block_number=block_number,
                     tx_hash=tx_hash,
@@ -281,7 +279,6 @@ class TransactionProcessor:
             # Write network fees
             for order_uid, (token_address, fee_amount) in network_fees.items():
                 self.db.write_fees(
-                    chain_name=self.chain_name,
                     auction_id=auction_id,
                     block_number=block_number,
                     tx_hash=tx_hash,
