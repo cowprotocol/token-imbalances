@@ -184,7 +184,7 @@ class TransactionProcessor:
             return protocol_fees, partner_fees, network_fees
         except Exception as e:
             logger.error(f"Failed to process fees for transaction {tx_hash}: {e}")
-            return {}, {}
+            return {}, {}, {}
 
     def process_prices_for_tokens(
         self,
