@@ -6,7 +6,7 @@ from src.imbalances_script import RawTokenImbalances
 from src.price_providers.price_feed import PriceFeed
 from src.helpers.helper_functions import read_sql_file, set_params
 from src.helpers.config import CHAIN_SLEEP_TIME, logger
-from src.fees.compute_fees import batch_fee_imbalances
+from src.fees.compute_fees import compute_all_fees_of_batch
 import time
 
 
@@ -166,7 +166,9 @@ class TransactionProcessor:
     ) -> tuple[dict[str, tuple[str, int]], dict[str, tuple[str, int]]]:
         """Process and return protocol and network fees for a given transaction."""
         try:
-            protocol_fees, network_fees = batch_fee_imbalances(HexBytes(tx_hash))
+            protocol_fees, partner_fees, network_fees = compute_all_fees_of_batch(
+                HexBytes(tx_hash)
+            )
             return protocol_fees, network_fees
         except Exception as e:
             logger.error(f"Failed to process fees for transaction {tx_hash}: {e}")

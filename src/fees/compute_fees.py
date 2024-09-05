@@ -478,14 +478,13 @@ class OrderbookFetcher:
         return fee_policies
 
 
-# computing fees
-def compute_fee_imbalances(
-    settlement_data: SettlementData,
-) -> tuple[
-    dict[str, tuple[str, int]],
-    dict[str, tuple[str, int]],
-    dict[str, tuple[str, int, str]],
-]:
+# function that computes all fees of all orders in a batch
+# Note that currently it is NOT working for CoW AMMs as they are not indexed.
+def compute_all_fees_of_batch(
+    tx_hash: HexBytes,
+) -> tuple[dict[str, tuple[str, int]], dict[str, tuple[str, int]]]:
+    orderbook_api = OrderbookFetcher()
+    settlement_data = orderbook_api.get_all_data(tx_hash)
     protocol_fees: dict[str, tuple[str, int]] = {}
     network_fees: dict[str, tuple[str, int]] = {}
     partner_fees: dict[str, tuple[str, int, str]] = {}
@@ -497,26 +496,13 @@ def compute_fee_imbalances(
             protocol_fee_token.to_0x_hex(),
             protocol_fee_amount,
         )
-        network_fees[trade.order_uid.to_0x_hex()] = (
-            trade.sell_token.to_0x_hex(),
-            trade.network_fee,
-        )
         partner_fees[trade.order_uid.to_0x_hex()] = (
             protocol_fee_token.to_0x_hex(),
             trade.partner_fee,
             trade.partner_fee_recipient,
         )
-
-    return protocol_fees, network_fees, partner_fees
-
-
-# combined function
-
-
-def batch_fee_imbalances(
-    tx_hash: HexBytes,
-) -> tuple[dict[str, tuple[str, int]], dict[str, tuple[str, int]]]:
-    orderbook_api = OrderbookFetcher()
-    settlement_data = orderbook_api.get_all_data(tx_hash)
-    protocol_fees, network_fees, partner_fees = compute_fee_imbalances(settlement_data)
-    return protocol_fees, network_fees
+        network_fees[trade.order_uid.to_0x_hex()] = (
+            trade.sell_token.to_0x_hex(),
+            trade.network_fee,
+        )
+    return protocol_fees, partner_fees, network_fees
