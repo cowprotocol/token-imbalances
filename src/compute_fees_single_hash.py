@@ -1,10 +1,6 @@
 from hexbytes import HexBytes
-from web3 import Web3
-from src.imbalances_script import RawTokenImbalances
-from src.price_providers.price_feed import PriceFeed
 from src.fees.compute_fees import compute_all_fees_of_batch
-from src.helpers.config import get_web3_instance, logger
-from contracts.erc20_abi import erc20_abi
+from src.helpers.config import logger
 
 
 def log_token_data(title: str, data: dict, name: str):
