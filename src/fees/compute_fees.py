@@ -98,7 +98,7 @@ class Trade:
             total_protocol_fee = raw_trade.surplus() - self.surplus()
 
         surplus_fee = self.compute_surplus_fee()  # in the surplus token
-        network_fee_in_surplus_token = surplus_fee - self.total_protocol_fee
+        network_fee_in_surplus_token = surplus_fee - total_protocol_fee
         if self.kind == "sell":
             network_fee = int(
                 network_fee_in_surplus_token
