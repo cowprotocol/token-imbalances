@@ -109,9 +109,11 @@ class TransactionProcessor:
 
             # Compute Fees
             if self.process_fees:
-                protocol_fees, network_fees = self.process_fees_for_transaction(
-                    tx_hash, auction_id, block_number
-                )
+                (
+                    protocol_fees,
+                    partner_fees,
+                    network_fees,
+                ) = self.process_fees_for_transaction(tx_hash)
 
             # Compute Prices
             if self.process_prices:
@@ -134,7 +136,12 @@ class TransactionProcessor:
 
             if self.process_fees:
                 self.handle_fees(
-                    protocol_fees, network_fees, auction_id, block_number, tx_hash
+                    protocol_fees,
+                    partner_fees,
+                    network_fees,
+                    auction_id,
+                    block_number,
+                    tx_hash,
                 )
 
             if self.process_prices and prices:
@@ -162,14 +169,19 @@ class TransactionProcessor:
             return {}
 
     def process_fees_for_transaction(
-        self, tx_hash: str, auction_id: int, block_number: int
-    ) -> tuple[dict[str, tuple[str, int]], dict[str, tuple[str, int]]]:
+        self,
+        tx_hash: str,
+    ) -> tuple[
+        dict[str, tuple[str, int]],
+        dict[str, tuple[str, int, str]],
+        dict[str, tuple[str, int]],
+    ]:
         """Process and return protocol and network fees for a given transaction."""
         try:
             protocol_fees, partner_fees, network_fees = compute_all_fees_of_batch(
                 HexBytes(tx_hash)
             )
-            return protocol_fees, network_fees
+            return protocol_fees, partner_fees, network_fees
         except Exception as e:
             logger.error(f"Failed to process fees for transaction {tx_hash}: {e}")
             return {}, {}
@@ -226,6 +238,7 @@ class TransactionProcessor:
     def handle_fees(
         self,
         protocol_fees: dict[str, tuple[str, int]],
+        partner_fees: dict[str, tuple[str, int, str]],
         network_fees: dict[str, tuple[str, int]],
         auction_id: int,
         block_number: int,
@@ -244,6 +257,25 @@ class TransactionProcessor:
                     token_address=token_address,
                     fee_amount=float(fee_amount),
                     fee_type="protocol",
+                    recipient="",
+                )
+
+            # Write partner fees
+            for order_uid, (
+                token_address,
+                fee_amount,
+                recipient,
+            ) in partner_fees.items():
+                self.db.write_fees(
+                    chain_name=self.chain_name,
+                    auction_id=auction_id,
+                    block_number=block_number,
+                    tx_hash=tx_hash,
+                    order_uid=order_uid,
+                    token_address=token_address,
+                    fee_amount=float(fee_amount),
+                    fee_type="partner",
+                    recipient=recipient,
                 )
 
             # Write network fees
@@ -257,6 +289,7 @@ class TransactionProcessor:
                     token_address=token_address,
                     fee_amount=float(fee_amount),
                     fee_type="network",
+                    recipient="",
                 )
         except Exception as err:
             logger.error(

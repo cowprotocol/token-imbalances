@@ -97,16 +97,22 @@ class Database:
         token_address: str,
         fee_amount: float,
         fee_type: str,
+        recipient: str,
     ):
         """Function attempts to write price data to the table."""
         tx_hash_bytes = bytes.fromhex(tx_hash[2:])
         token_address_bytes = bytes.fromhex(token_address[2:])
         order_uid_bytes = bytes.fromhex(order_uid[2:])
+
         query = read_sql_file("src/sql/insert_fee.sql")
+        final_recipient = None
+        if recipient != "":
+            final_recipient = bytes.fromhex(recipient[2:])
+
         self.execute_and_commit(
             query,
             {
-                "chain_name": self.chain_name,
+                "chain_name": chain_name,
                 "auction_id": auction_id,
                 "block_number": block_number,
                 "tx_hash": tx_hash_bytes,
@@ -114,5 +120,6 @@ class Database:
                 "token_address": token_address_bytes,
                 "fee_amount": fee_amount,
                 "fee_type": fee_type,
+                "recipient": final_recipient,
             },
         )
