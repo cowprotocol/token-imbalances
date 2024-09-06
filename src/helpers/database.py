@@ -121,6 +121,6 @@ class Database:
                 "token_address": token_address_bytes,
                 "fee_amount": fee_amount,
                 "fee_type": fee_type,
-                "recipient": final_recipient,
+                "fee_recipient": final_recipient,
             },
         )
