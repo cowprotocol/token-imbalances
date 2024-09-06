@@ -94,7 +94,7 @@ class Trade:
         for i, fee_policy in enumerate(reversed(self.fee_policies)):
             raw_trade = fee_policy.reverse_protocol_fee(raw_trade)
             ## we assume that partner fee is the last to be applied
-            if i == 0 and self.partner_fee_recipient is not NULL_ADDRESS:
+            if i == 0 and self.partner_fee_recipient != NULL_ADDRESS:
                 partner_fee = raw_trade.surplus() - self.surplus()
         total_protocol_fee = raw_trade.surplus() - self.surplus()
 
