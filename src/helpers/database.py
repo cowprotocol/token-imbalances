@@ -2,6 +2,7 @@ from sqlalchemy import text
 from sqlalchemy.engine import Engine
 from src.helpers.config import check_db_connection, logger
 from src.helpers.helper_functions import read_sql_file
+from src.constants import NULL_ADDRESS_STRING
 
 
 class Database:
@@ -102,9 +103,10 @@ class Database:
         tx_hash_bytes = bytes.fromhex(tx_hash[2:])
         token_address_bytes = bytes.fromhex(token_address[2:])
         order_uid_bytes = bytes.fromhex(order_uid[2:])
+        null_address_bytes = bytes.fromhex(NULL_ADDRESS_STRING[2:])
 
         query = read_sql_file("src/sql/insert_fee.sql")
-        final_recipient = None
+        final_recipient = null_address_bytes
         if recipient != "":
             final_recipient = bytes.fromhex(recipient[2:])
 
