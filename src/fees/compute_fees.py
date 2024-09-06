@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from fractions import Fraction
 import math
 import os
+from time import sleep
 from typing import Any
 import requests
 import json
@@ -412,6 +413,7 @@ class OrderbookFetcher:
                 )
                 response.raise_for_status()
                 auction_data = response.json()
+                sleep(0.5)  # introducing some delays so that we don't overload the api
                 return auction_data, environment
             except requests.exceptions.HTTPError as err:
                 if err.response.status_code == 404:
@@ -427,6 +429,7 @@ class OrderbookFetcher:
             url,
             timeout=REQUEST_TIMEOUT,
         )
+        sleep(0.5)  # introducing some delays so that we don't overload the api
         if response.ok == False:
             # jit CoW AMM detected
             return None
@@ -437,6 +440,7 @@ class OrderbookFetcher:
         prefix = self.orderbook_urls[environment]
         url = prefix + f"trades?orderUid={uid.to_0x_hex()}"
         response = requests.get(url)
+        sleep(0.5)  # introducing some delays so that we don't overload the api
         trade_data_temp = response.json()
         for t in trade_data_temp:
             if HexBytes(t["txHash"]) == tx_hash:
