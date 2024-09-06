@@ -18,6 +18,8 @@ INVALIDATED_ORDER_TOPIC = (
     "0x875b6cb035bbd4ac6500fabc6d1e4ca5bdc58a3e2b424ccb5c24cdbebeb009a9"
 )
 
+NULL_ADDRESS = Web3.to_checksum_address("0x0000000000000000000000000000000000000000")
+
 REQUEST_TIMEOUT = 5
 
 # Time limit, currently set to 1 full day, after which Coingecko Token List is re-fetched (in seconds)

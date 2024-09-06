@@ -5,33 +5,59 @@ from fractions import Fraction
 import math
 import os
 from typing import Any
-from dotenv import load_dotenv
-from eth_typing import Address
-from hexbytes import HexBytes
-
-from src.constants import (
-    REQUEST_TIMEOUT,
-)
 import requests
+import json
+from dotenv import load_dotenv
+from eth_typing import ChecksumAddress
+from hexbytes import HexBytes
+from web3 import Web3
+
+from src.constants import REQUEST_TIMEOUT, NULL_ADDRESS
 
 # types for trades
 
 
 @dataclass
 class Trade:
-    """Class for"""
+    """Class for describing a trade, together with the fees associated with it.
+    We note that we use the NULL address to indicate that there are no partner fees.
+    Note that in case an order is placed with the partner fee recipient being the null address,
+    the partner fee will instead be accounted for as protocol fee and will be withheld by the DAO.
+    """
 
-    order_uid: HexBytes
-    sell_amount: int
-    buy_amount: int
-    sell_token: HexBytes
-    buy_token: HexBytes
-    limit_sell_amount: int
-    limit_buy_amount: int
-    kind: str
-    sell_token_clearing_price: int
-    buy_token_clearing_price: int
-    fee_policies: list["FeePolicy"]
+    def __init__(
+        self,
+        order_uid: HexBytes,
+        sell_amount: int,
+        buy_amount: int,
+        sell_token: HexBytes,
+        buy_token: HexBytes,
+        limit_sell_amount: int,
+        limit_buy_amount: int,
+        kind: str,
+        sell_token_clearing_price: int,
+        buy_token_clearing_price: int,
+        fee_policies: list["FeePolicy"],
+        partner_fee_recipient: ChecksumAddress,
+    ):
+        self.order_uid = order_uid
+        self.sell_amount = sell_amount
+        self.buy_amount = buy_amount
+        self.sell_token = sell_token
+        self.buy_token = buy_token
+        self.limit_sell_amount = limit_sell_amount
+        self.limit_buy_amount = limit_buy_amount
+        self.kind = kind
+        self.sell_token_clearing_price = sell_token_clearing_price
+        self.buy_token_clearing_price = buy_token_clearing_price
+        self.fee_policies = fee_policies
+        self.partner_fee_recipient = partner_fee_recipient  # if there is no partner, then its value is set to the null address
+
+        total_protocol_fee, partner_fee, network_fee = self.compute_all_fees()
+        self.total_protocol_fee = total_protocol_fee
+        self.partner_fee = partner_fee
+        self.network_fee = network_fee
+        return
 
     def volume(self) -> int:
         """Compute volume of a trade in the surplus token"""
@@ -62,20 +88,28 @@ class Trade:
             return current_limit_sell_amount - self.sell_amount
         raise ValueError(f"Order kind {self.kind} is invalid.")
 
-    def raw_surplus(self) -> int:
-        """Compute raw surplus of a trade in the surplus token
-        First, the application of protocol fees is reversed. Then, surplus of the resulting trade
-        is computed."""
+    def compute_all_fees(self) -> tuple[int, int, int]:
         raw_trade = deepcopy(self)
-        for fee_policy in reversed(self.fee_policies):
+        partner_fee = 0
+        for i, fee_policy in enumerate(reversed(self.fee_policies)):
             raw_trade = fee_policy.reverse_protocol_fee(raw_trade)
-        return raw_trade.surplus()
+            ## we assume that partner fee is the last to be applied
+            if i == 0 and self.partner_fee_recipient != NULL_ADDRESS:
+                partner_fee = raw_trade.surplus() - self.surplus()
+        total_protocol_fee = raw_trade.surplus() - self.surplus()
 
-    def protocol_fee(self):
-        """Compute protocol fees of a trade in the surplus token
-        Protocol fees are computed as the difference of raw surplus and surplus."""
-
-        return self.raw_surplus() - self.surplus()
+        surplus_fee = self.compute_surplus_fee()  # in the surplus token
+        network_fee_in_surplus_token = surplus_fee - total_protocol_fee
+        if self.kind == "sell":
+            network_fee = int(
+                network_fee_in_surplus_token
+                * Fraction(
+                    self.buy_token_clearing_price, self.sell_token_clearing_price
+                )
+            )
+        else:
+            network_fee = network_fee_in_surplus_token
+        return total_protocol_fee, partner_fee, network_fee
 
     def surplus_token(self) -> HexBytes:
         """Returns the surplus token"""
@@ -336,6 +370,14 @@ class OrderbookFetcher:
             buy_token_clearing_price = clearing_prices[buy_token]
             fee_policies = self.parse_fee_policies(trade_data["feePolicies"])
 
+            app_data = json.loads(order_data["fullAppData"])
+            if "partnerFee" in app_data["metadata"].keys():
+                partner_fee_recipient = Web3.to_checksum_address(
+                    HexBytes(app_data["metadata"]["partnerFee"]["recipient"])
+                )
+            else:
+                partner_fee_recipient = NULL_ADDRESS
+
             trade = Trade(
                 order_uid=uid,
                 sell_amount=executed_sell_amount,
@@ -348,6 +390,7 @@ class OrderbookFetcher:
                 sell_token_clearing_price=sell_token_clearing_price,
                 buy_token_clearing_price=buy_token_clearing_price,
                 fee_policies=fee_policies,
+                partner_fee_recipient=partner_fee_recipient,
             )
             trades.append(trade)
 
@@ -436,48 +479,35 @@ class OrderbookFetcher:
         return fee_policies
 
 
-# computing fees
-def compute_fee_imbalances(
-    settlement_data: SettlementData,
-) -> tuple[dict[str, tuple[str, int]], dict[str, tuple[str, int]]]:
+# function that computes all fees of all orders in a batch
+# Note that currently it is NOT working for CoW AMMs as they are not indexed.
+def compute_all_fees_of_batch(
+    tx_hash: HexBytes,
+) -> tuple[
+    dict[str, tuple[str, int]],
+    dict[str, tuple[str, int, str]],
+    dict[str, tuple[str, int]],
+]:
+    orderbook_api = OrderbookFetcher()
+    settlement_data = orderbook_api.get_all_data(tx_hash)
     protocol_fees: dict[str, tuple[str, int]] = {}
     network_fees: dict[str, tuple[str, int]] = {}
+    partner_fees: dict[str, tuple[str, int, str]] = {}
     for trade in settlement_data.trades:
         # protocol fees
-        protocol_fee_amount = trade.protocol_fee()
+        protocol_fee_amount = trade.total_protocol_fee - trade.partner_fee
         protocol_fee_token = trade.surplus_token()
         protocol_fees[trade.order_uid.to_0x_hex()] = (
             protocol_fee_token.to_0x_hex(),
             protocol_fee_amount,
         )
-        # network fees
-        surplus_fee = trade.compute_surplus_fee()  # in the surplus token
-        network_fee = surplus_fee - protocol_fee_amount
-        if trade.kind == "sell":
-            network_fee_sell = int(
-                network_fee
-                * Fraction(
-                    trade.buy_token_clearing_price, trade.sell_token_clearing_price
-                )
-            )
-        else:
-            network_fee_sell = network_fee
-
+        partner_fees[trade.order_uid.to_0x_hex()] = (
+            protocol_fee_token.to_0x_hex(),
+            trade.partner_fee,
+            trade.partner_fee_recipient,
+        )
         network_fees[trade.order_uid.to_0x_hex()] = (
             trade.sell_token.to_0x_hex(),
-            network_fee_sell,
+            trade.network_fee,
         )
-
-    return protocol_fees, network_fees
-
-
-# combined function
-
-
-def batch_fee_imbalances(
-    tx_hash: HexBytes,
-) -> tuple[dict[str, tuple[str, int]], dict[str, tuple[str, int]]]:
-    orderbook_api = OrderbookFetcher()
-    settlement_data = orderbook_api.get_all_data(tx_hash)
-    protocol_fees, network_fees = compute_fee_imbalances(settlement_data)
-    return protocol_fees, network_fees
+    return protocol_fees, partner_fees, network_fees
