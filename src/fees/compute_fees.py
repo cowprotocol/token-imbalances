@@ -415,7 +415,9 @@ class OrderbookFetcher:
                     )
                     response.raise_for_status()
                     auction_data = response.json()
-                    sleep(0.5)  # introducing some delays so that we don't overload the api
+                    sleep(
+                        0.5
+                    )  # introducing some delays so that we don't overload the api
                     return auction_data, environment
                 except requests.exceptions.HTTPError as err:
                     if err.response.status_code == 404:
