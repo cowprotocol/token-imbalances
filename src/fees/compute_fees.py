@@ -379,7 +379,6 @@ class OrderbookFetcher:
                         HexBytes(app_data["metadata"]["partnerFee"]["recipient"])
                     )
 
-
             trade = Trade(
                 order_uid=uid,
                 sell_amount=executed_sell_amount,
