@@ -372,12 +372,13 @@ class OrderbookFetcher:
             fee_policies = self.parse_fee_policies(trade_data["feePolicies"])
 
             app_data = json.loads(order_data["fullAppData"])
-            if "partnerFee" in app_data["metadata"].keys():
-                partner_fee_recipient = Web3.to_checksum_address(
-                    HexBytes(app_data["metadata"]["partnerFee"]["recipient"])
-                )
-            else:
-                partner_fee_recipient = NULL_ADDRESS
+            partner_fee_recipient = NULL_ADDRESS
+            if "metadata" in app_data.keys():
+                if "partnerFee" in app_data["metadata"].keys():
+                    partner_fee_recipient = Web3.to_checksum_address(
+                        HexBytes(app_data["metadata"]["partnerFee"]["recipient"])
+                    )
+
 
             trade = Trade(
                 order_uid=uid,
