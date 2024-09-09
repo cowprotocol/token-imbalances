@@ -13,7 +13,7 @@ def main() -> None:
         return
 
     process_imbalances = True
-    process_fees = True
+    process_fees = False
     process_prices = True
 
     web3, db_engine = initialize_connections()
