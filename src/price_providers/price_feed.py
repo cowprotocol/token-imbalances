@@ -8,12 +8,15 @@ from src.helpers.config import logger
 class PriceFeed:
     """Class encapsulating the different price providers."""
 
-    def __init__(self):
-        self.providers = [
-            CoingeckoPriceProvider(),
-            MoralisPriceProvider(),
-            AuctionPriceProvider(),
-        ]
+    def __init__(self, activate: bool):
+        if activate:
+            self.providers = [
+                CoingeckoPriceProvider(),
+                MoralisPriceProvider(),
+                AuctionPriceProvider(),
+            ]
+        else:
+            self.providers = []
 
     def get_price(self, price_params: dict) -> tuple[float, str] | None:
         """Function iterates over list of price provider objects and attempts to get a price."""
