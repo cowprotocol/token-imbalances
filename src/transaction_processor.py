@@ -116,9 +116,9 @@ class TransactionProcessor:
                 ) = self.process_fees_for_transaction(tx_hash)
 
             # Compute Prices
-            if self.process_prices:
+            if self.process_prices and self.process_imbalances:
                 prices = self.process_prices_for_tokens(
-                    token_imbalances, protocol_fees, network_fees, block_number, tx_hash
+                    token_imbalances, block_number, tx_hash
                 )
 
             # Write to database iff no errors in either computations
@@ -189,23 +189,19 @@ class TransactionProcessor:
     def process_prices_for_tokens(
         self,
         token_imbalances: dict[str, int],
-        protocol_fees: dict[str, tuple[str, int]],
-        network_fees: dict[str, tuple[str, int]],
         block_number: int,
         tx_hash: str,
     ) -> dict[str, tuple[float, str]]:
         """Compute prices for tokens with non-null imbalances."""
         prices = {}
         try:
-            slippage = calculate_slippage(token_imbalances, protocol_fees, network_fees)
-            for token_address in slippage.keys():
-                if slippage[token_address] != 0:
-                    price_data = self.price_providers.get_price(
-                        set_params(token_address, block_number, tx_hash)
-                    )
-                    if price_data:
-                        price, source = price_data
-                        prices[token_address] = (price, source)
+            for token_address in token_imbalances.keys():
+                price_data = self.price_providers.get_price(
+                    set_params(token_address, block_number, tx_hash)
+                )
+                if price_data:
+                    price, source = price_data
+                    prices[token_address] = (price, source)
         except Exception as e:
             logger.error(f"Failed to process prices for transaction {tx_hash}: {e}")
 
