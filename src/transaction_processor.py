@@ -116,7 +116,7 @@ class TransactionProcessor:
                 ) = self.process_fees_for_transaction(tx_hash)
 
             # Compute Prices
-            if self.process_prices:
+            if self.process_prices and self.process_imbalances:
                 prices = self.process_prices_for_tokens(
                     token_imbalances, block_number, tx_hash
                 )
