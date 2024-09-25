@@ -30,7 +30,7 @@ class TransactionProcessor:
         self.process_prices = process_prices
 
         self.imbalances = RawTokenImbalances(self.blockchain_data.web3, self.chain_name)
-        self.price_providers = PriceFeed()
+        self.price_providers = PriceFeed(activate=process_prices)
         self.log_message: list[str] = []
 
     def get_start_block(self) -> int:
