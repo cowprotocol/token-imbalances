@@ -1,6 +1,6 @@
 .env
+venv
 .log
 __pycache__
 .pytest_cache
-src/tempCodeRunnerFile.py
-.DS_Store
+slippage_project.log
