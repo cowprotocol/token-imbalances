@@ -1,0 +1,15 @@
+dune-client
+moralis
+pandas
+pandas-stubs
+psycopg2
+python-dotenv
+requests
+types-psycopg2
+types-requests
+SQLAlchemy
+web3
+black
+mypy
+pylint
+pytest
