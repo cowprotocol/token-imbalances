@@ -290,7 +290,7 @@ class TransactionProcessor:
             )
 
     def handle_prices(
-        self, prices: dict[str, tuple[float, str]], tx_hash: str, block_number: int
+        self, prices: dict[str, List[tuple[float, str]]], tx_hash: str, block_number: int
     ) -> None:
         """Function writes prices to table per token."""
         try:
