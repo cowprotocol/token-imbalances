@@ -47,13 +47,17 @@ class TransactionProcessor:
             )
             row = result.fetchone()
             max_block = row[0] if row is not None else None
+            blockchain_latest_block = self.blockchain_data.get_latest_block()
 
             # If no entries present, fallback to get_latest_block()
             if max_block is None:
-                return self.blockchain_data.get_latest_block()
+                return blockchain_latest_block
 
             logger.info("Fetched max block number from database: %d", max_block)
-            return max_block + 1
+            if max_block > blockchain_latest_block - 7200:
+                return max_block + 1
+            else:
+                return blockchain_latest_block
         except Exception as e:
             logger.error("Error fetching start block from database: %s", e)
             raise
