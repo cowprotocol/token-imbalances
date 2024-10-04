@@ -201,10 +201,7 @@ class TransactionProcessor:
                     set_params(token_address, block_number, tx_hash)
                 )
                 if price_data:
-                    res = []
-                    for data_point in price_data:
-                        res.append(data_point)
-                    prices[token_address] = res
+                    prices[token_address] = price_data
         except Exception as e:
             logger.error(f"Failed to process prices for transaction {tx_hash}: {e}")
 
