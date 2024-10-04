@@ -1,4 +1,3 @@
-from typing import List
 from src.price_providers.coingecko_pricing import CoingeckoPriceProvider
 from src.price_providers.dune_pricing import DunePriceProvider
 from src.price_providers.moralis_pricing import MoralisPriceProvider
@@ -19,7 +18,7 @@ class PriceFeed:
         else:
             self.providers = []
 
-    def get_price(self, price_params: dict) -> List[tuple[float, str]]:
+    def get_price(self, price_params: dict) -> list[tuple[float, str]]:
         """Function iterates over list of price provider objects and attempts to get a price."""
         prices = []
         for provider in self.providers:
