@@ -53,6 +53,6 @@ class MoralisPriceProvider(AbstractPriceProvider):
             self.logger.warning(f"Error: {e}")
         except Exception as e:
             self.logger.warning(
-                f"Price retrieval for token: {token_address} returned: {e}"
+                f"Price retrieval for token: {token_address} returned: {e}. Possibly the Moralis API key is missing."
             )
         return None
