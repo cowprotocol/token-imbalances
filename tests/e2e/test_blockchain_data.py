@@ -1,11 +1,8 @@
 from os import getenv, environ
 from unittest.mock import patch
 
-from dotenv import load_dotenv
 import pytest
 from web3 import Web3
-
-load_dotenv()
 
 
 @pytest.fixture()
@@ -14,6 +11,7 @@ def set_env_variables(monkeypatch):
     with patch.dict(environ, clear=True):
         envvars = {
             "CHAIN_SLEEP_TIME": "1",
+            "NODE_URL": "https://rpc.mevblocker.io",
         }
         for k, v in envvars.items():
             monkeypatch.setenv(k, v)
