@@ -18,14 +18,13 @@ class PriceFeed:
         else:
             self.providers = []
 
-    def get_price(self, price_params: dict) -> list[tuple[float, str]]:
+    def get_price(self, price_params: dict) -> tuple[float, str] | None:
         """Function iterates over list of price provider objects and attempts to get a price."""
-        prices = []
         for provider in self.providers:
             try:
                 price = provider.get_price(price_params)
                 if price is not None:
-                    prices.append((price, provider.name))
+                    return price, provider.name
             except Exception as e:
                 logger.error(f"Error getting price from provider {provider.name}: {e}")
-        return prices
+        return None
