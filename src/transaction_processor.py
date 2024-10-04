@@ -35,8 +35,11 @@ class TransactionProcessor:
 
     def get_start_block(self) -> int:
         """
-        Retrieve the most recent block already present in raw_token_imbalances table,
-        delete entries for that block, and return this block number as start_block.
+        Retrieve the most recent block X already present in raw_token_imbalances table,
+        and return block X+1 as start_block.
+        If block X is from more than 1 day ago, a recent finalized block is returned.
+        TODO: Remove that rule before moving to production.
+
         If no entries are present, fallback to get_finalized_block_number().
         """
         try:
@@ -47,19 +50,18 @@ class TransactionProcessor:
             )
             row = result.fetchone()
             max_block = row[0] if row is not None else None
+            blockchain_latest_block = self.blockchain_data.get_latest_block()
 
             # If no entries present, fallback to get_latest_block()
             if max_block is None:
-                return self.blockchain_data.get_latest_block()
+                return blockchain_latest_block
 
             logger.info("Fetched max block number from database: %d", max_block)
-
-            # Delete entries for the max block from the table
-            delete_sql = read_sql_file("src/sql/delete_entries_max_block.sql")
-            self.db.execute_and_commit(
-                delete_sql, {"chain_name": self.chain_name, "block_number": max_block}
-            )
-            return max_block
+            if max_block > blockchain_latest_block - 7200:
+                return max_block + 1
+            else:
+                #  TODO: Remove this rule before moving to production.
+                return blockchain_latest_block
         except Exception as e:
             logger.error("Error fetching start block from database: %s", e)
             raise
