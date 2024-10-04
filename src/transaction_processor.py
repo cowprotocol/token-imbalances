@@ -35,8 +35,8 @@ class TransactionProcessor:
 
     def get_start_block(self) -> int:
         """
-        Retrieve the most recent block already present in raw_token_imbalances table,
-        delete entries for that block, and return this block number as start_block.
+        Retrieve the most recent block X already present in raw_token_imbalances table,
+        and return block X+1 as start_block.
         If no entries are present, fallback to get_finalized_block_number().
         """
         try:
@@ -53,13 +53,7 @@ class TransactionProcessor:
                 return self.blockchain_data.get_latest_block()
 
             logger.info("Fetched max block number from database: %d", max_block)
-
-            # Delete entries for the max block from the table
-            delete_sql = read_sql_file("src/sql/delete_entries_max_block.sql")
-            self.db.execute_and_commit(
-                delete_sql, {"chain_name": self.chain_name, "block_number": max_block}
-            )
-            return max_block
+            return max_block + 1
         except Exception as e:
             logger.error("Error fetching start block from database: %s", e)
             raise
