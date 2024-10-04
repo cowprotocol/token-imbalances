@@ -1,4 +1,3 @@
-import time
 from hexbytes import HexBytes
 from web3 import Web3
 from src.helpers.blockchain_data import BlockchainData
@@ -8,6 +7,7 @@ from src.price_providers.price_feed import PriceFeed
 from src.helpers.helper_functions import read_sql_file, set_params
 from src.helpers.config import CHAIN_SLEEP_TIME, logger
 from src.fees.compute_fees import compute_all_fees_of_batch
+import time
 
 
 class TransactionProcessor:
@@ -193,7 +193,7 @@ class TransactionProcessor:
         token_imbalances: dict[str, int],
         block_number: int,
         tx_hash: str,
-    ) -> dict[str, list[tuple[float, str]]]:
+    ) -> dict[str, tuple[float, str]]:
         """Compute prices for tokens with non-null imbalances."""
         prices = {}
         try:
@@ -202,7 +202,8 @@ class TransactionProcessor:
                     set_params(token_address, block_number, tx_hash)
                 )
                 if price_data:
-                    prices[token_address] = price_data
+                    price, source = price_data
+                    prices[token_address] = (price, source)
         except Exception as e:
             logger.error(f"Failed to process prices for transaction {tx_hash}: {e}")
 
@@ -291,21 +292,15 @@ class TransactionProcessor:
             )
 
     def handle_prices(
-        self,
-        prices: dict[str, list[tuple[float, str]]],
-        tx_hash: str,
-        block_number: int,
+        self, prices: dict[str, tuple[float, str]], tx_hash: str, block_number: int
     ) -> None:
         """Function writes prices to table per token."""
         try:
-            for token_address, list_of_prices in prices.items():
-                for price, source in list_of_prices:
-                    self.db.write_prices(
-                        source, block_number, tx_hash, token_address, price
-                    )
-                    self.log_message.append(
-                        f"Token: {token_address}, Price: {price} ETH, Source: {source}"
-                    )
+            for token_address, (price, source) in prices.items():
+                self.db.write_prices(
+                    source, block_number, tx_hash, token_address, price
+                )
+                self.log_message.append(f"Token: {token_address}, Price: {price} ETH")
         except Exception as err:
             logger.error(f"Error: {err}")
 
