@@ -37,6 +37,9 @@ class TransactionProcessor:
         """
         Retrieve the most recent block X already present in raw_token_imbalances table,
         and return block X+1 as start_block.
+        If block X is from more than 1 day ago, a recent finalized block is returned.
+        TODO: Remove that rule before moving to production.
+
         If no entries are present, fallback to get_finalized_block_number().
         """
         try:
@@ -57,6 +60,7 @@ class TransactionProcessor:
             if max_block > blockchain_latest_block - 7200:
                 return max_block + 1
             else:
+                #  TODO: Remove this rule before moving to production.
                 return blockchain_latest_block
         except Exception as e:
             logger.error("Error fetching start block from database: %s", e)
