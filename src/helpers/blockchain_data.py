@@ -50,6 +50,7 @@ class BlockchainData:
                     if any(
                         log.topics[0].to_0x_hex() == INVALIDATED_ORDER_TOPIC
                         for log in receipt.logs  # type: ignore[attr-defined]
+                        if log.topics  # type: ignore[attr-defined]
                     ):
                         continue
                     # status = 0 indicates a reverted tx, status = 1 is successful tx
