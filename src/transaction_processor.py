@@ -1,7 +1,6 @@
 import time
 from hexbytes import HexBytes
 from web3 import Web3
-from typing import List
 from src.helpers.blockchain_data import BlockchainData
 from src.helpers.database import Database
 from src.imbalances_script import RawTokenImbalances
@@ -192,7 +191,7 @@ class TransactionProcessor:
         token_imbalances: dict[str, int],
         block_number: int,
         tx_hash: str,
-    ) -> dict[str, List[tuple[float, str]]]:
+    ) -> dict[str, list[tuple[float, str]]]:
         """Compute prices for tokens with non-null imbalances."""
         prices = {}
         try:
@@ -291,7 +290,7 @@ class TransactionProcessor:
 
     def handle_prices(
         self,
-        prices: dict[str, List[tuple[float, str]]],
+        prices: dict[str, list[tuple[float, str]]],
         tx_hash: str,
         block_number: int,
     ) -> None:
