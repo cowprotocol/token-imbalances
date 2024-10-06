@@ -7,7 +7,6 @@ from web3 import Web3
 
 @pytest.fixture()
 def set_env_variables(monkeypatch):
-    """Set `REMOVE_SOLVER_PK` to a string so that blacklisting can be called."""
     with patch.dict(environ, clear=True):
         envvars = {
             "CHAIN_SLEEP_TIME": "1",
