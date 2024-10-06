@@ -25,3 +25,5 @@ jobs:
           black --check ./
       - name: Type Check (mypy)
         run: mypy src
+      - name: Tests
+        run: pytest tests/e2e/test_blockchain_data.py
