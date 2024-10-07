@@ -27,3 +27,5 @@ jobs:
         run: mypy src
       - name: Tests
         run: pytest tests/e2e/test_blockchain_data.py tests/e2e/test_imbalances_script.py
+        env:
+          NODE_URL: ${{ secrets.NODE_URL }}
