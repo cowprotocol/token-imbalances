@@ -151,14 +151,15 @@ class RawTokenImbalances:
 
         events: dict[str, list[dict]] = {name: [] for name in EVENT_TOPICS}
         for log in tx_receipt["logs"]:
-            log_topic = log["topics"][0].hex()
-            if log_topic in transfer_topics.values():
-                events["Transfer"].append(log)
-            else:
-                for event_name, topic in other_topics.items():
-                    if log_topic == topic:
-                        events[event_name].append(log)
-                        break
+            if log["topics"]:
+                log_topic = log["topics"][0].hex()
+                if log_topic in transfer_topics.values():
+                    events["Transfer"].append(log)
+                else:
+                    for event_name, topic in other_topics.items():
+                        if log_topic == topic:
+                            events[event_name].append(log)
+                            break
         return events
 
     def decode_event(self, event: dict) -> tuple[str | None, str | None, int | None]:
