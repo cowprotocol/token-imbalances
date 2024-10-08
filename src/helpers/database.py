@@ -143,3 +143,20 @@ class Database:
                 "time": datetime.fromtimestamp(transaction_timestamp[1]),
             },
         )
+
+    def write_transaction_tokens(
+        self, transaction_tokens: list[tuple[str, str]]
+    ) -> None:
+        """Function writes the transaction timestamp to the table."""
+        query = (
+            "INSERT INTO transaction_tokens (tx_hash, token_address) "
+            "VALUES (:tx_hash, :token_address);"
+        )
+        for tx_hash, token_address in transaction_tokens:
+            self.execute_and_commit(
+                query,
+                {
+                    "tx_hash": bytes.fromhex(tx_hash[2:]),
+                    "token_address": bytes.fromhex(token_address[2:]),
+                },
+            )
