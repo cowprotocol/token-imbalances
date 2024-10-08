@@ -1,4 +1,4 @@
-CREATE TABLE transaction_times (
+CREATE TABLE transaction_timestamps (
     tx_hash bytea PRIMARY KEY,
     time timestamp NOT NULL
 );
