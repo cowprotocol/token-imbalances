@@ -1,23 +1,27 @@
-CREATE TABLE token_info (
-    token_address bytea PRIMARY KEY,
-    symbol varchar NOT NULL,
-    decimals int NOT NULL
+CREATE TABLE transaction_times (
+    tx_hash bytea PRIMARY KEY,
+    time timestamp NOT NULL
 );
 
-CREATE TABLE token_times (
-    time timestamp NOT NULL,
-    token_address bytea NOT NULL,
-    block_number bigint NOT NULL,
+CREATE TABLE transaction_tokens (
     tx_hash bytea NOT NULL,
+    token_address bytea NOT NULL,
 
-    PRIMARY KEY (time, token_address, tx_hash)
+    PRIMARY KEY (tx_hash, token_address)
 );
+
+CREATE TYPE PriceSource AS ENUM ('coingecko', 'moralis', 'dune', 'native');
 
 CREATE TABLE prices (
-    time timestamp NOT NULL,
     token_address bytea NOT NULL,
+    time timestamp NOT NULL,
     price numeric(60, 18) NOT NULL,
-    source varchar NOT NULL,
+    source PriceSource NOT NULL,
 
-    PRIMARY KEY (time, token_address, source)
+    PRIMARY KEY (token_address, time, source)
+);
+
+CREATE TABLE token_decimals (
+    token_address bytea PRIMARY KEY,
+    decimals int NOT NULL
 );
