@@ -24,7 +24,7 @@ Steps for computing token imbalances:
 
 from web3 import Web3
 from web3.datastructures import AttributeDict
-from web3.types import TxReceipt
+from web3.types import HexStr, TxReceipt
 from src.helpers.config import CHAIN_RPC_ENDPOINTS, logger
 from src.constants import (
     SETTLEMENT_CONTRACT_ADDRESS,
@@ -333,13 +333,17 @@ class RawTokenImbalances:
             raise
 
 
-def get_transaction_token_timestamps(
-    tx_hash: str, web3: Web3
-) -> list[tuple[str, str, int]]:
+def get_transaction_timestamp(tx_hash: str, web3: Web3) -> tuple[str, int]:
     receipt = web3.eth.get_transaction_receipt(HexStr(tx_hash))
     block_number = receipt["blockNumber"]
     block = web3.eth.get_block(block_number)
     timestamp = block["timestamp"]
+
+    return tx_hash, timestamp
+
+
+def get_transaction_tokens(tx_hash: str, web3: Web3) -> list[tuple[str, str]]:
+    receipt = web3.eth.get_transaction_receipt(HexStr(tx_hash))
 
     transfer_topic = web3.keccak(text="Transfer(address,address,uint256)")
 
@@ -349,7 +353,7 @@ def get_transaction_token_timestamps(
             token_address = log["address"]
             token_addresses.add(token_address)
 
-    return [(tx_hash, token_address, timestamp) for token_address in token_addresses]
+    return [(tx_hash, token_address) for token_address in token_addresses]
 
 
 def main() -> None:

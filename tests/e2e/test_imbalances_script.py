@@ -37,19 +37,27 @@ def tests_process_single_transaction(set_env_variables):
     }
 
 
-def test_get_transaction_token_timestamps(set_env_variables):
-    from src.imbalances_script import get_transaction_token_timestamps
+def test_get_transaction_timestamp(set_env_variables):
+    from src.imbalances_script import get_transaction_timestamp
 
     web3 = Web3(Web3.HTTPProvider(getenv("NODE_URL")))
     tx_hash = "0xb75e03b63d4f06c56549effd503e1e37f3ccfc3c00e6985a5aacc9b0534d7c5c"
 
-    transaction_token_timestamps = get_transaction_token_timestamps(tx_hash, web3)
+    transaction_timestamp = get_transaction_timestamp(tx_hash, web3)
 
-    assert all(h == tx_hash for h, _, _ in transaction_token_timestamps)
-    assert all(t == 1728044411 for _, _, t in transaction_token_timestamps)
-    assert set(
-        token_address for _, token_address, _ in transaction_token_timestamps
-    ) == {
+    assert transaction_timestamp == (tx_hash, 1728044411)
+
+
+def test_get_transaction_tokens(set_env_variables):
+    from src.imbalances_script import get_transaction_tokens
+
+    web3 = Web3(Web3.HTTPProvider(getenv("NODE_URL")))
+    tx_hash = "0xb75e03b63d4f06c56549effd503e1e37f3ccfc3c00e6985a5aacc9b0534d7c5c"
+
+    transaction_tokens = get_transaction_tokens(tx_hash, web3)
+
+    assert all(h == tx_hash for h, _ in transaction_tokens)
+    assert set(token_address for _, token_address in transaction_tokens) == {
         "0x7Fc66500c84A76Ad7e9c93437bFc5Ac33E2DDaE9",
         "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
         "0x812Ba41e071C7b7fA4EBcFB62dF5F45f6fA853Ee",
