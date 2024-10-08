@@ -1,5 +1,8 @@
-from sqlalchemy import text
+from datetime import datetime
+
+from sqlalchemy import text, func
 from sqlalchemy.engine import Engine
+
 from src.helpers.config import check_db_connection, logger
 from src.helpers.helper_functions import read_sql_file
 from src.constants import NULL_ADDRESS_STRING
@@ -122,5 +125,21 @@ class Database:
                 "fee_amount": fee_amount,
                 "fee_type": fee_type,
                 "fee_recipient": final_recipient,
+            },
+        )
+
+    def write_transaction_timestamp(
+        self, transaction_timestamp: tuple[str, int]
+    ) -> None:
+        """Function writes the transaction timestamp to the table."""
+        query = (
+            "INSERT INTO transaction_timestamps (tx_hash, time) "
+            "VALUES (:tx_hash, :time);"
+        )
+        self.execute_and_commit(
+            query,
+            {
+                "tx_hash": bytes.fromhex(transaction_timestamp[0][2:]),
+                "time": datetime.fromtimestamp(transaction_timestamp[1]),
             },
         )
