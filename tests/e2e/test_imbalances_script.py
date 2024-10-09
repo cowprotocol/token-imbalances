@@ -20,6 +20,9 @@ def tests_process_single_transaction(set_env_variables):
     # import has to happen after patching environment variable
     from src.imbalances_script import RawTokenImbalances
 
+    if getenv("NODE_URL") is None:
+        assert False
+
     web3 = Web3(Web3.HTTPProvider(getenv("NODE_URL")))
     raw_imbalances = RawTokenImbalances(web3, "mainnet")
     imbalances = raw_imbalances.compute_imbalances(
