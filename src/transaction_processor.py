@@ -1,21 +1,27 @@
+import time
+
 from hexbytes import HexBytes
 from web3 import Web3
+
+from src.fees.compute_fees import compute_all_fees_of_batch
 from src.helpers.blockchain_data import BlockchainData
+from src.helpers.config import CHAIN_SLEEP_TIME, logger
 from src.helpers.database import Database
+from src.helpers.helper_functions import read_sql_file, set_params
 from src.imbalances_script import (
     RawTokenImbalances,
     get_transaction_timestamp,
     get_transaction_tokens,
 )
 from src.price_providers.price_feed import PriceFeed
-from src.helpers.helper_functions import read_sql_file, set_params
-from src.helpers.config import CHAIN_SLEEP_TIME, logger
-from src.fees.compute_fees import compute_all_fees_of_batch
-import time
+
+# pylint: disable=logging-fstring-interpolation
 
 
 class TransactionProcessor:
     """Class processes transactions for the slippage project."""
+
+    # pylint: disable=too-many-instance-attributes, too-many-arguments
 
     def __init__(
         self,

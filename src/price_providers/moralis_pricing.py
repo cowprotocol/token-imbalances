@@ -1,11 +1,14 @@
+import os
+
+from dotenv import load_dotenv
 from moralis import evm_api
+
 from src.helpers.config import get_logger
-import os, dotenv
 from src.price_providers.pricing_model import AbstractPriceProvider
 from src.helpers.helper_functions import extract_params
 
 
-dotenv.load_dotenv()
+load_dotenv()
 
 
 class MoralisPriceProvider(AbstractPriceProvider):
