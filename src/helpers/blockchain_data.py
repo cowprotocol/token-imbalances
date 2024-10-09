@@ -1,5 +1,7 @@
 from hexbytes import HexBytes
 from web3 import Web3
+
+from contracts.erc20_abi import erc20_abi
 from src.helpers.config import logger
 from src.constants import SETTLEMENT_CONTRACT_ADDRESS, INVALIDATED_ORDER_TOPIC
 
@@ -71,3 +73,11 @@ class BlockchainData:
         # convert bytes to int
         auction_id = int.from_bytes(call_data_bytes[-8:], byteorder="big")
         return auction_id
+
+
+def get_token_decimals(token_address: str, web3: Web3) -> int:
+    """Get number of decimals for a token."""
+    contract = web3.eth.contract(
+        address=Web3.to_checksum_address(token_address), abi=erc20_abi
+    )
+    return contract.functions.decimals().call()
