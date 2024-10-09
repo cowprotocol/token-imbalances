@@ -10,7 +10,6 @@ def set_env_variables(monkeypatch):
     with patch.dict(environ, clear=True):
         envvars = {
             "CHAIN_SLEEP_TIME": "1",
-            "NODE_URL": getenv("NODE_URL"),
         }
         for k, v in envvars.items():
             monkeypatch.setenv(k, v)
@@ -20,9 +19,6 @@ def set_env_variables(monkeypatch):
 def tests_process_single_transaction(set_env_variables):
     # import has to happen after patching environment variable
     from src.imbalances_script import RawTokenImbalances
-
-    if getenv("NODE_URL") is None:
-        assert False
 
     web3 = Web3(Web3.HTTPProvider(getenv("NODE_URL")))
     raw_imbalances = RawTokenImbalances(web3, "mainnet")
