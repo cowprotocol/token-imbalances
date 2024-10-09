@@ -123,6 +123,30 @@ class TransactionProcessor:
         """Function processes a single tx to find imbalances, fees, prices including writing to database."""
         self.log_message = []
         try:
+            # get transaction timestamp
+            transaction_timestamp = get_transaction_timestamp(
+                tx_hash, self.blockchain_data.web3
+            )
+            # store transaction timestamp
+            self.db.write_transaction_timestamp(transaction_timestamp)
+
+            # get transaction tokens
+            transaction_tokens = get_transaction_tokens(
+                tx_hash, self.blockchain_data.web3
+            )
+            # store transaction tokens
+            self.db.write_transaction_tokens(transaction_tokens)
+
+            # get token decimals
+
+            # store token decimals
+
+            # get prices
+            prices = self.process_prices_for_tokens(
+                token_imbalances, block_number, tx_hash
+            )
+            # store prices
+
             # Compute Raw Token Imbalances
             if self.process_imbalances:
                 token_imbalances = self.process_token_imbalances(
@@ -207,6 +231,27 @@ class TransactionProcessor:
         except Exception as e:
             logger.error(f"Failed to process fees for transaction {tx_hash}: {e}")
             return {}, {}, {}
+
+    def get_prices_for_tokens(
+        self,
+        transaction_timestamp: tuple[str, int],
+        transaction_tokens: list[tuple[str, str]],
+    ) -> dict[str, tuple[float, str]]:
+        """Fetch prices for all transferred tokens."""
+        prices = {}
+        token_addresses = [token_address for _, token_address in transaction_tokens]
+        try:
+            for token_address in token_addresses:
+                price_data = self.price_providers.get_price(
+                    set_params(token_address, block_number, tx_hash)
+                )
+                if price_data:
+                    price, source = price_data
+                    prices[token_address] = (price, source)
+        except Exception as e:
+            logger.error(f"Failed to process prices for transaction {tx_hash}: {e}")
+
+        return prices
 
     def process_prices_for_tokens(
         self,
