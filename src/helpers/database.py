@@ -162,6 +162,23 @@ class Database:
                 },
             )
 
+    def write_prices_new(self, prices: list[tuple[str, int, float, str]]) -> None:
+        """Write prices to database."""
+        query = (
+            "INSERT INTO prices (token_address, time, price, source) "
+            "VALUES (:token_address, :time, :price, :source);"
+        )
+        for token_address, time, price, source in prices:
+            self.execute_and_commit(
+                query,
+                {
+                    "token_address": bytes.fromhex(token_address[2:]),
+                    "time": datetime.fromtimestamp(time),
+                    "price": price,
+                    "source": source,
+                },
+            )
+
     def get_latest_transaction(self) -> str | None:
         """Get latest transaction hash.
         If no transaction is found, return None."""

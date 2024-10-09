@@ -142,10 +142,11 @@ class TransactionProcessor:
             # store token decimals
 
             # get prices
-            prices = self.process_prices_for_tokens(
-                token_imbalances, block_number, tx_hash
+            prices_new = self.get_prices_for_tokens(
+                transaction_timestamp, transaction_tokens
             )
             # store prices
+            self.db.write_prices_new(prices_new)
 
             # Compute Raw Token Imbalances
             if self.process_imbalances:
@@ -236,18 +237,29 @@ class TransactionProcessor:
         self,
         transaction_timestamp: tuple[str, int],
         transaction_tokens: list[tuple[str, str]],
-    ) -> dict[str, tuple[float, str]]:
+    ) -> list[tuple[str, int, float, str]]:
         """Fetch prices for all transferred tokens."""
-        prices = {}
+        prices: list[tuple[str, int, float, str]] = []
+        tx_hash = transaction_timestamp[0]
+        timestamp = transaction_timestamp[1]
         token_addresses = [token_address for _, token_address in transaction_tokens]
+        block_number = self.blockchain_data.web3.eth.get_transaction_receipt(
+            HexBytes(tx_hash)
+        )["blockNumber"]
         try:
             for token_address in token_addresses:
                 price_data = self.price_providers.get_price(
                     set_params(token_address, block_number, tx_hash)
                 )
                 if price_data:
-                    price, source = price_data
-                    prices[token_address] = (price, source)
+                    prices.append(
+                        (token_address, timestamp, price_data[0], price_data[1])
+                    )
+                else:
+                    logger.warning(
+                        f"Failed to fetch price for token {token_address} and"
+                        f"transaction {tx_hash}."
+                    )
         except Exception as e:
             logger.error(f"Failed to process prices for transaction {tx_hash}: {e}")
 
