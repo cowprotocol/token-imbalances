@@ -1,25 +1,11 @@
-from os import getenv, environ
-from unittest.mock import Mock, patch
+from os import getenv
 
-import pytest
 from web3 import Web3
 
-
-@pytest.fixture()
-def set_env_variables(monkeypatch):
-    with patch.dict(environ, clear=True):
-        envvars = {
-            "CHAIN_SLEEP_TIME": "1",
-        }
-        for k, v in envvars.items():
-            monkeypatch.setenv(k, v)
-        yield  # This is the magical bit which restore the environment after
+from src.imbalances_script import RawTokenImbalances
 
 
-def tests_process_single_transaction(set_env_variables):
-    # import has to happen after patching environment variable
-    from src.imbalances_script import RawTokenImbalances
-
+def tests_process_single_transaction():
     web3 = Web3(Web3.HTTPProvider(getenv("NODE_URL")))
     raw_imbalances = RawTokenImbalances(web3, "mainnet")
     imbalances = raw_imbalances.compute_imbalances(
