@@ -6,8 +6,6 @@ from src.imbalances_script import RawTokenImbalances
 
 
 def tests_process_single_transaction():
-    # import has to happen after patching environment variable
-
     web3 = Web3(Web3.HTTPProvider(getenv("NODE_URL")))
     raw_imbalances = RawTokenImbalances(web3, "mainnet")
     imbalances = raw_imbalances.compute_imbalances(

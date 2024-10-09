@@ -1,26 +1,11 @@
-from os import getenv, environ
-from unittest.mock import patch
+from os import getenv
 
-import pytest
 from web3 import Web3
 
-
-@pytest.fixture()
-def set_env_variables(monkeypatch):
-    with patch.dict(environ, clear=True):
-        envvars = {
-            "CHAIN_SLEEP_TIME": "1",
-            "NODE_URL": "https://rpc.mevblocker.io",
-        }
-        for k, v in envvars.items():
-            monkeypatch.setenv(k, v)
-        yield  # This is the magical bit which restore the environment after
+from src.helpers.blockchain_data import BlockchainData
 
 
-def tests_get_tx_hashes_blocks(set_env_variables):
-    # import has to happen after patching environment variable
-    from src.helpers.blockchain_data import BlockchainData
-
+def tests_get_tx_hashes_blocks():
     web3 = Web3(Web3.HTTPProvider(getenv("NODE_URL")))
     blockchain = BlockchainData(web3)
     start_block = 20892118
