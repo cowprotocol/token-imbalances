@@ -2,7 +2,11 @@ from os import getenv
 
 from web3 import Web3
 
-from src.imbalances_script import RawTokenImbalances
+from src.imbalances_script import (
+    RawTokenImbalances,
+    get_transaction_timestamp,
+    get_transaction_tokens,
+)
 
 
 def tests_process_single_transaction():
@@ -23,9 +27,7 @@ def tests_process_single_transaction():
     }
 
 
-def test_get_transaction_timestamp(set_env_variables):
-    from src.imbalances_script import get_transaction_timestamp
-
+def test_get_transaction_timestamp():
     web3 = Web3(Web3.HTTPProvider(getenv("NODE_URL")))
     tx_hash = "0xb75e03b63d4f06c56549effd503e1e37f3ccfc3c00e6985a5aacc9b0534d7c5c"
 
@@ -34,9 +36,7 @@ def test_get_transaction_timestamp(set_env_variables):
     assert transaction_timestamp == (tx_hash, 1728044411)
 
 
-def test_get_transaction_tokens(set_env_variables):
-    from src.imbalances_script import get_transaction_tokens
-
+def test_get_transaction_tokens():
     web3 = Web3(Web3.HTTPProvider(getenv("NODE_URL")))
     tx_hash = "0xb75e03b63d4f06c56549effd503e1e37f3ccfc3c00e6985a5aacc9b0534d7c5c"
 
