@@ -1,6 +1,7 @@
 from datetime import datetime
 
-from sqlalchemy import text, func
+from hexbytes import HexBytes
+from sqlalchemy import text
 from sqlalchemy.engine import Engine
 
 from src.helpers.config import check_db_connection, logger
@@ -160,3 +161,15 @@ class Database:
                     "token_address": bytes.fromhex(token_address[2:]),
                 },
             )
+
+    def get_latest_transaction(self) -> str | None:
+        """Get latest transaction hash.
+        If no transaction is found, return None."""
+        query = "SELECT tx_hash FROM transaction_timestamps ORDER BY time DESC LIMIT 1;"
+        result = self.execute_query(query, {}).fetchone()
+
+        if result is None:
+            return None
+
+        latest_tx_hash = HexBytes(result[0]).to_0x_hex()
+        return latest_tx_hash
