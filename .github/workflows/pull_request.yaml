@@ -29,3 +29,4 @@ jobs:
         run: pytest tests/e2e/test_blockchain_data.py tests/e2e/test_imbalances_script.py
         env:
           NODE_URL: ${{ secrets.NODE_URL }}
+          CHAIN_SLEEP_TIME: 1
