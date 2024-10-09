@@ -18,7 +18,7 @@ class MoralisPriceProvider(AbstractPriceProvider):
 
     @property
     def name(self) -> str:
-        return "Moralis"
+        return "moralis"
 
     @staticmethod
     def wei_to_eth(price: str) -> float | None:

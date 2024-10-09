@@ -29,7 +29,7 @@ class CoingeckoPriceProvider(AbstractPriceProvider):
 
     @property
     def name(self) -> str:
-        return "Coingecko"
+        return "coingecko"
 
     def fetch_coingecko_list(self) -> list[dict]:
         """
