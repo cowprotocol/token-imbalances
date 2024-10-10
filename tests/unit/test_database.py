@@ -8,7 +8,7 @@ from src.helpers.database import Database
 
 def tests_write_transaction_timestamp():
     engine = create_engine(
-        f"postgresql+psycopg2://postgres:postgres@localhost:5432/mainnet"
+        f"postgresql+psycopg://postgres:postgres@localhost:5432/mainnet"
     )
     db = Database(engine, "mainnet")
     # truncate table
@@ -38,7 +38,7 @@ def tests_write_transaction_tokens():
     # import has to happen after patching environment variable
 
     engine = create_engine(
-        f"postgresql+psycopg2://postgres:postgres@localhost:5432/mainnet"
+        f"postgresql+psycopg://postgres:postgres@localhost:5432/mainnet"
     )
     db = Database(engine, "mainnet")
     transaction_tokens = [
@@ -69,7 +69,7 @@ def tests_write_transaction_tokens():
 
 def tests_write_prices():
     engine = create_engine(
-        f"postgresql+psycopg2://postgres:postgres@localhost:5432/mainnet"
+        f"postgresql+psycopg://postgres:postgres@localhost:5432/mainnet"
     )
     db = Database(engine, "mainnet")
     token_prices = [
@@ -109,7 +109,7 @@ def test_get_latest_transaction():
     from src.helpers.database import Database
 
     engine = create_engine(
-        f"postgresql+psycopg2://postgres:postgres@localhost:5432/mainnet"
+        f"postgresql+psycopg://postgres:postgres@localhost:5432/mainnet"
     )
     db = Database(engine, "mainnet")
     # truncate table

@@ -25,7 +25,7 @@ def update_token_decimals(engine, web3) -> None:
 
 
 if __name__ == "__main__":
-    engine = create_engine(f"postgresql+psycopg2://{getenv('SOLVER_SLIPPAGE_DB_URL')}")
+    engine = create_engine(f"postgresql+psycopg://{getenv('SOLVER_SLIPPAGE_DB_URL')}")
     web3 = Web3(Web3.HTTPProvider(getenv("NODE_URL")))
 
     update_token_decimals(engine, web3)
