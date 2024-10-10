@@ -2,10 +2,9 @@ dune-client
 moralis
 pandas
 pandas-stubs
-psycopg2
+psycopg
 python-dotenv
 requests
-types-psycopg2
 types-requests
 SQLAlchemy
 web3
