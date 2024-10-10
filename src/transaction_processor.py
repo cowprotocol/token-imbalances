@@ -258,9 +258,10 @@ class TransactionProcessor:
                     set_params(token_address, block_number, tx_hash)
                 )
                 if price_data:
-                    prices.append(
-                        (token_address, timestamp, price_data[0], price_data[1])
-                    )
+                    prices += [
+                        (token_address, timestamp, price, source)
+                        for price, source in price_data
+                    ]
                 else:
                     logger.warning(
                         f"Failed to fetch price for token {token_address} and"
@@ -285,7 +286,7 @@ class TransactionProcessor:
                     set_params(token_address, block_number, tx_hash)
                 )
                 if price_data:
-                    price, source = price_data
+                    price, source = price_data[0]
                     prices[token_address] = (price, source)
         except Exception as e:
             logger.error(f"Failed to process prices for transaction {tx_hash}: {e}")
