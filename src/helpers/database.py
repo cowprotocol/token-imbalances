@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from hexbytes import HexBytes
-from sqlalchemy import text
+from sqlalchemy import text, insert, Table, Column, Integer, LargeBinary, MetaData
 from sqlalchemy.engine import Engine
 
 from src.helpers.config import check_db_connection, logger
@@ -190,3 +190,37 @@ class Database:
 
         latest_tx_hash = HexBytes(result[0]).to_0x_hex()
         return latest_tx_hash
+
+    def get_tokens_without_decimals(self) -> list[str]:
+        """Get tokens without decimals."""
+        query = (
+            "SELECT token_address FROM transaction_tokens "
+            "WHERE token_address not in (SELECT token_address FROM token_decimals);"
+        )
+        result = self.execute_query(query, {}).fetchall()
+        return list({HexBytes(row[0]).to_0x_hex() for row in result})
+
+    def write_token_decimals(self, token_decimals: list[tuple[str, int]]) -> None:
+        self.engine = check_db_connection(self.engine, "solver_slippage")
+
+        # Define the table without creating a model class
+        token_decimals_table = Table(
+            "token_decimals",
+            MetaData(),
+            Column("token_address", LargeBinary, primary_key=True),
+            Column("decimals", Integer, nullable=False),
+        )
+
+        # Prepare the data
+        values = [
+            {"token_address": bytes.fromhex(token_address[2:]), "decimals": decimals}
+            for token_address, decimals in token_decimals
+        ]
+
+        # Create the insert statement
+        stmt = insert(token_decimals_table).values(values)
+
+        # Execute the bulk insert
+        with self.engine.connect() as conn:
+            conn.execute(stmt)
+            conn.commit()

@@ -4,16 +4,17 @@ from hexbytes import HexBytes
 from web3 import Web3
 
 from src.fees.compute_fees import compute_all_fees_of_batch
-from src.helpers.blockchain_data import BlockchainData
-from src.helpers.config import CHAIN_SLEEP_TIME, logger
-from src.helpers.database import Database
-from src.helpers.helper_functions import read_sql_file, set_params
-from src.imbalances_script import (
-    RawTokenImbalances,
+from src.helpers.blockchain_data import (
+    BlockchainData,
     get_transaction_timestamp,
     get_transaction_tokens,
 )
+from src.helpers.config import CHAIN_SLEEP_TIME, logger
+from src.helpers.database import Database
+from src.helpers.helper_functions import read_sql_file, set_params
+from src.imbalances_script import RawTokenImbalances
 from src.price_providers.price_feed import PriceFeed
+from src.token_decimals import update_token_decimals
 
 # pylint: disable=logging-fstring-interpolation
 
@@ -143,9 +144,8 @@ class TransactionProcessor:
             # store transaction tokens
             self.db.write_transaction_tokens(transaction_tokens)
 
-            # get token decimals
-
-            # store token decimals
+            # update token decimals
+            update_token_decimals(self.db.engine, self.blockchain_data.web3)
 
             # get prices
             prices_new = self.get_prices_for_tokens(
