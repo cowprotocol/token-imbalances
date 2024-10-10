@@ -15,7 +15,7 @@ CREATE TYPE PriceSource AS ENUM ('coingecko', 'moralis', 'dune', 'native');
 CREATE TABLE prices (
     token_address bytea NOT NULL,
     time timestamp NOT NULL,
-    price numeric(60, 18) NOT NULL,
+    price numeric(78, 18) NOT NULL,
     source PriceSource NOT NULL,
 
     PRIMARY KEY (token_address, time, source)
