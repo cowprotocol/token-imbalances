@@ -1,26 +1,12 @@
-from os import getenv, environ
-from unittest.mock import patch
+from datetime import datetime
 
 from hexbytes import HexBytes
-import pytest
 from sqlalchemy import create_engine, text
 
-
-@pytest.fixture()
-def set_env_variables(monkeypatch):
-    with patch.dict(environ, clear=True):
-        envvars = {
-            "CHAIN_SLEEP_TIME": "1",
-        }
-        for k, v in envvars.items():
-            monkeypatch.setenv(k, v)
-        yield  # This is the magical bit which restore the environment after
+from src.helpers.database import Database
 
 
-def tests_write_transaction_timestamp(set_env_variables):
-    # import has to happen after patching environment variable
-    from src.helpers.database import Database
-
+def tests_write_transaction_timestamp():
     engine = create_engine(
         f"postgresql+psycopg2://postgres:postgres@localhost:5432/mainnet"
     )
@@ -48,9 +34,8 @@ def tests_write_transaction_timestamp(set_env_variables):
     assert res[1].timestamp() == 1728044411
 
 
-def tests_write_transaction_tokens(set_env_variables):
+def tests_write_transaction_tokens():
     # import has to happen after patching environment variable
-    from src.helpers.database import Database
 
     engine = create_engine(
         f"postgresql+psycopg2://postgres:postgres@localhost:5432/mainnet"
@@ -82,7 +67,44 @@ def tests_write_transaction_tokens(set_env_variables):
         assert HexBytes(res[i][1]) == HexBytes(token_address)
 
 
-def test_get_latest_transaction(set_env_variables):
+def tests_write_prices():
+    engine = create_engine(
+        f"postgresql+psycopg2://postgres:postgres@localhost:5432/mainnet"
+    )
+    db = Database(engine, "mainnet")
+    token_prices = [
+        (
+            "0xA0B86991C6218B36C1D19D4A2E9EB0CE3606EB48",
+            int(datetime.fromisoformat("2024-10-10 16:48:47.000000").timestamp()),
+            0.000420454193230350,
+            "coingecko",
+        ),
+        (
+            "0x68BBED6A47194EFF1CF514B50EA91895597FC91E",
+            int(datetime.fromisoformat("2024-10-10 16:49:47.000000").timestamp()),
+            0.000000050569218629,
+            "moralis",
+        ),
+    ]
+    # truncate table
+    with engine.connect() as conn:
+        conn.execute(text("TRUNCATE prices"))
+        conn.commit()
+    # write data
+    db.write_prices_new(token_prices)
+    # read data
+    with engine.connect() as conn:
+        res = conn.execute(
+            text("SELECT token_address, time, price, source FROM prices")
+        ).all()
+    for i, (token_address, time, price, source) in enumerate(token_prices):
+        assert HexBytes(res[i][0]) == HexBytes(token_address)
+        assert res[i][1].timestamp() == time
+        assert float(res[i][2]) == price
+        assert res[i][3] == source
+
+
+def test_get_latest_transaction():
     # import has to happen after patching environment variable
     from src.helpers.database import Database
 
