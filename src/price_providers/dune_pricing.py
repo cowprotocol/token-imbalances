@@ -23,7 +23,7 @@ class DunePriceProvider(AbstractPriceProvider):
 
     @property
     def name(self) -> str:
-        return "Dune"
+        return "dune"
 
     def initialize_dune_client(self) -> DuneClient | None:
         """

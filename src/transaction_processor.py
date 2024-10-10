@@ -1,17 +1,28 @@
+import time
+
 from hexbytes import HexBytes
 from web3 import Web3
-from src.helpers.blockchain_data import BlockchainData
+
+from src.fees.compute_fees import compute_all_fees_of_batch
+from src.helpers.blockchain_data import (
+    BlockchainData,
+    get_transaction_timestamp,
+    get_transaction_tokens,
+)
+from src.helpers.config import CHAIN_SLEEP_TIME, logger
 from src.helpers.database import Database
+from src.helpers.helper_functions import read_sql_file, set_params
 from src.imbalances_script import RawTokenImbalances
 from src.price_providers.price_feed import PriceFeed
-from src.helpers.helper_functions import read_sql_file, set_params
-from src.helpers.config import CHAIN_SLEEP_TIME, logger
-from src.fees.compute_fees import compute_all_fees_of_batch
-import time
+from src.token_decimals import update_token_decimals
+
+# pylint: disable=logging-fstring-interpolation
 
 
 class TransactionProcessor:
     """Class processes transactions for the slippage project."""
+
+    # pylint: disable=too-many-instance-attributes, too-many-arguments
 
     def __init__(
         self,
@@ -43,25 +54,41 @@ class TransactionProcessor:
         If no entries are present, fallback to get_finalized_block_number().
         """
         try:
-            # Query for the maximum block number
-            query_max_block = read_sql_file("src/sql/select_max_block.sql")
-            result = self.db.execute_query(
-                query_max_block, {"chain_name": self.chain_name}
-            )
-            row = result.fetchone()
-            max_block = row[0] if row is not None else None
-            blockchain_latest_block = self.blockchain_data.get_latest_block()
-
-            # If no entries present, fallback to get_latest_block()
-            if max_block is None:
-                return blockchain_latest_block
-
-            logger.info("Fetched max block number from database: %d", max_block)
-            if max_block > blockchain_latest_block - 7200:
-                return max_block + 1
+            # 1) get last transaction from DB
+            latest_tx_hash = self.db.get_latest_transaction()
+            # 2) get block of that transaction
+            if latest_tx_hash:
+                block_number = int(
+                    self.blockchain_data.web3.eth.get_transaction_receipt(
+                        HexBytes(latest_tx_hash)
+                    )["blockNumber"]
+                )
             else:
-                #  TODO: Remove this rule before moving to production.
-                return blockchain_latest_block
+                logger.warning(
+                    f"No transaction found in database. Using recent block instead."
+                )
+                block_number = self.blockchain_data.get_latest_block()
+            return block_number + 1
+
+            # # Query for the maximum block number
+            # query_max_block = read_sql_file("src/sql/select_max_block.sql")
+            # result = self.db.execute_query(
+            #     query_max_block, {"chain_name": self.chain_name}
+            # )
+            # row = result.fetchone()
+            # max_block = row[0] if row is not None else None
+            # blockchain_latest_block = self.blockchain_data.get_latest_block()
+            #
+            # # If no entries present, fallback to get_latest_block()
+            # if max_block is None:
+            #     return blockchain_latest_block
+            #
+            # logger.info("Fetched max block number from database: %d", max_block)
+            # if max_block > blockchain_latest_block - 7200:
+            #     return max_block + 1
+            # else:
+            #     #  TODO: Remove this rule before moving to production.
+            #     return blockchain_latest_block
         except Exception as e:
             logger.error("Error fetching start block from database: %s", e)
             raise
@@ -103,6 +130,30 @@ class TransactionProcessor:
         """Function processes a single tx to find imbalances, fees, prices including writing to database."""
         self.log_message = []
         try:
+            # get transaction timestamp
+            transaction_timestamp = get_transaction_timestamp(
+                tx_hash, self.blockchain_data.web3
+            )
+            # store transaction timestamp
+            self.db.write_transaction_timestamp(transaction_timestamp)
+
+            # get transaction tokens
+            transaction_tokens = get_transaction_tokens(
+                tx_hash, self.blockchain_data.web3
+            )
+            # store transaction tokens
+            self.db.write_transaction_tokens(transaction_tokens)
+
+            # update token decimals
+            update_token_decimals(self.db.engine, self.blockchain_data.web3)
+
+            # get prices
+            prices_new = self.get_prices_for_tokens(
+                transaction_timestamp, transaction_tokens
+            )
+            # store prices
+            self.db.write_prices_new(prices_new)
+
             # Compute Raw Token Imbalances
             if self.process_imbalances:
                 token_imbalances = self.process_token_imbalances(
@@ -188,6 +239,39 @@ class TransactionProcessor:
             logger.error(f"Failed to process fees for transaction {tx_hash}: {e}")
             return {}, {}, {}
 
+    def get_prices_for_tokens(
+        self,
+        transaction_timestamp: tuple[str, int],
+        transaction_tokens: list[tuple[str, str]],
+    ) -> list[tuple[str, int, float, str]]:
+        """Fetch prices for all transferred tokens."""
+        prices: list[tuple[str, int, float, str]] = []
+        tx_hash = transaction_timestamp[0]
+        timestamp = transaction_timestamp[1]
+        token_addresses = [token_address for _, token_address in transaction_tokens]
+        block_number = self.blockchain_data.web3.eth.get_transaction_receipt(
+            HexBytes(tx_hash)
+        )["blockNumber"]
+        try:
+            for token_address in token_addresses:
+                price_data = self.price_providers.get_price(
+                    set_params(token_address, block_number, tx_hash)
+                )
+                if price_data:
+                    prices += [
+                        (token_address, timestamp, price, source)
+                        for price, source in price_data
+                    ]
+                else:
+                    logger.warning(
+                        f"Failed to fetch price for token {token_address} and"
+                        f"transaction {tx_hash}."
+                    )
+        except Exception as e:
+            logger.error(f"Failed to process prices for transaction {tx_hash}: {e}")
+
+        return prices
+
     def process_prices_for_tokens(
         self,
         token_imbalances: dict[str, int],
@@ -202,7 +286,7 @@ class TransactionProcessor:
                     set_params(token_address, block_number, tx_hash)
                 )
                 if price_data:
-                    price, source = price_data
+                    price, source = price_data[0]
                     prices[token_address] = (price, source)
         except Exception as e:
             logger.error(f"Failed to process prices for transaction {tx_hash}: {e}")
