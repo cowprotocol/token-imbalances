@@ -1,6 +1,7 @@
 from datetime import datetime
 
 from hexbytes import HexBytes
+import psycopg
 from sqlalchemy import text, insert, Table, Column, Integer, LargeBinary, MetaData
 from sqlalchemy.engine import Engine
 
@@ -169,15 +170,21 @@ class Database:
             "VALUES (:token_address, :time, :price, :source);"
         )
         for token_address, time, price, source in prices:
-            self.execute_and_commit(
-                query,
-                {
-                    "token_address": bytes.fromhex(token_address[2:]),
-                    "time": datetime.fromtimestamp(time),
-                    "price": price,
-                    "source": source,
-                },
-            )
+            try:
+                self.execute_and_commit(
+                    query,
+                    {
+                        "token_address": bytes.fromhex(token_address[2:]),
+                        "time": datetime.fromtimestamp(time),
+                        "price": price,
+                        "source": source,
+                    },
+                )
+            except psycopg.errors.NumericValueOutOfRange:
+                logger.warning(
+                    f"Error while writing price data. token: {token_address}, "
+                    f"time: {time}, price: {price}, source: {source}"
+                )
 
     def get_latest_transaction(self) -> str | None:
         """Get latest transaction hash.
