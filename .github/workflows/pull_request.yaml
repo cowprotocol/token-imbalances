@@ -22,7 +22,8 @@ jobs:
           - 5432:5432
         # Copy repo contents into container (needed to populate DB)
         volumes:
-          - ${{ github.workspace }}/database:/docker-entrypoint-initdb.d
+          - ${{ github.workspace }}/database/00_legacy_tables.sql:/docker-entrypoint-initdb.d/00_legacy_tables.sql
+          - ${{ github.workspace }}/database/01_table_creation.sql:/docker-entrypoint-initdb.d/01_table_creation.sql
     steps:
       - uses: actions/checkout@v3
       - name: Setup Python 3.12
