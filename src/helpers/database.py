@@ -133,7 +133,7 @@ class Database:
     def write_transaction_timestamp(
         self, transaction_timestamp: tuple[str, int]
     ) -> None:
-        """Function writes the transaction timestamp to the table."""
+        """Writes the transaction timestamp to database."""
         query = (
             "INSERT INTO transaction_timestamps (tx_hash, time) "
             "VALUES (:tx_hash, :time);"
@@ -149,7 +149,7 @@ class Database:
     def write_transaction_tokens(
         self, transaction_tokens: list[tuple[str, str]]
     ) -> None:
-        """Function writes the transaction timestamp to the table."""
+        """Writes the transaction tokens to the database."""
         query = (
             "INSERT INTO transaction_tokens (tx_hash, token_address) "
             "VALUES (:tx_hash, :token_address);"
