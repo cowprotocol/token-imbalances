@@ -1,0 +1,4 @@
+FROM postgres
+ENV POSTGRES_PASSWORD=postgres
+ENV POSTGRES_DB=mainnet
+COPY ./database/01_table_creation.sql /docker-entrypoint-initdb.d/

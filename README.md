@@ -24,5 +24,10 @@ python -m src.imbalances_script
 python -m src.daemon
 ```
 
-**To run the basic test in the `tests/` folder:**
- using pytest, simply run the command: `pytest` 
+## Tests
+
+To build and start a local database for testing use the command
+```sh
+docker build -t test_db_image -f Dockerfile.test_db .
+docker run -d --name test_db_container -p 5432:5432 test_db_image
+```
