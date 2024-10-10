@@ -135,7 +135,7 @@ class Database:
     ) -> None:
         """Writes the transaction timestamp to database."""
         query = (
-            "INSERT INTO transaction_timestamps (tx_hash, time) "
+            "INSERT INTO transaction_timestamp (tx_hash, time) "
             "VALUES (:tx_hash, :time);"
         )
         self.execute_and_commit(
@@ -189,7 +189,7 @@ class Database:
     def get_latest_transaction(self) -> str | None:
         """Get latest transaction hash.
         If no transaction is found, return None."""
-        query = "SELECT tx_hash FROM transaction_timestamps ORDER BY time DESC LIMIT 1;"
+        query = "SELECT tx_hash FROM transaction_timestamp ORDER BY time DESC LIMIT 1;"
         result = self.execute_query(query, {}).fetchone()
 
         if result is None:

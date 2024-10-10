@@ -13,7 +13,7 @@ def tests_write_transaction_timestamp():
     db = Database(engine, "mainnet")
     # truncate table
     with engine.connect() as conn:
-        conn.execute(text("TRUNCATE transaction_timestamps"))
+        conn.execute(text("TRUNCATE transaction_timestamp"))
         conn.commit()
     # write data
     db.write_transaction_timestamp(
@@ -25,7 +25,7 @@ def tests_write_transaction_timestamp():
     # read data
     with engine.connect() as conn:
         res = conn.execute(
-            text("SELECT tx_hash, time FROM transaction_timestamps")
+            text("SELECT tx_hash, time FROM transaction_timestamp")
         ).one()
     assert (
         "0x" + bytes(res[0]).hex()
@@ -114,7 +114,7 @@ def test_get_latest_transaction():
     db = Database(engine, "mainnet")
     # truncate table
     with engine.connect() as conn:
-        conn.execute(text("TRUNCATE transaction_timestamps"))
+        conn.execute(text("TRUNCATE transaction_timestamp"))
         conn.commit()
     # check that empty table returns None
     assert db.get_latest_transaction() is None
