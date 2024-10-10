@@ -43,7 +43,7 @@ jobs:
       - name: Type Check (mypy)
         run: mypy src
       - name: Tests
-        run: pytest tests/e2e/test_blockchain_data.py tests/e2e/test_imbalances_script.py
+        run: pytest tests/unit/ tests/e2e/
         env:
           NODE_URL: ${{ secrets.NODE_URL }}
           SOLVER_SLIPPAGE_DB_URL: postgres:postgres@localhost:5432/mainnet
