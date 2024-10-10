@@ -1,5 +1,6 @@
 from hexbytes import HexBytes
 from web3 import Web3
+from web3.types import HexStr
 
 from contracts.erc20_abi import erc20_abi
 from src.helpers.config import logger
@@ -73,6 +74,29 @@ class BlockchainData:
         # convert bytes to int
         auction_id = int.from_bytes(call_data_bytes[-8:], byteorder="big")
         return auction_id
+
+
+def get_transaction_timestamp(tx_hash: str, web3: Web3) -> tuple[str, int]:
+    receipt = web3.eth.get_transaction_receipt(HexStr(tx_hash))
+    block_number = receipt["blockNumber"]
+    block = web3.eth.get_block(block_number)
+    timestamp = block["timestamp"]
+
+    return tx_hash, timestamp
+
+
+def get_transaction_tokens(tx_hash: str, web3: Web3) -> list[tuple[str, str]]:
+    receipt = web3.eth.get_transaction_receipt(HexStr(tx_hash))
+
+    transfer_topic = web3.keccak(text="Transfer(address,address,uint256)")
+
+    token_addresses: set[str] = set()
+    for log in receipt["logs"]:
+        if log["topics"] and log["topics"][0] == transfer_topic:
+            token_address = log["address"]
+            token_addresses.add(token_address)
+
+    return [(tx_hash, token_address) for token_address in token_addresses]
 
 
 def get_token_decimals(token_address: str, web3: Web3) -> int:

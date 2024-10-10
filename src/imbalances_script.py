@@ -333,29 +333,6 @@ class RawTokenImbalances:
             raise
 
 
-def get_transaction_timestamp(tx_hash: str, web3: Web3) -> tuple[str, int]:
-    receipt = web3.eth.get_transaction_receipt(HexStr(tx_hash))
-    block_number = receipt["blockNumber"]
-    block = web3.eth.get_block(block_number)
-    timestamp = block["timestamp"]
-
-    return tx_hash, timestamp
-
-
-def get_transaction_tokens(tx_hash: str, web3: Web3) -> list[tuple[str, str]]:
-    receipt = web3.eth.get_transaction_receipt(HexStr(tx_hash))
-
-    transfer_topic = web3.keccak(text="Transfer(address,address,uint256)")
-
-    token_addresses: set[str] = set()
-    for log in receipt["logs"]:
-        if log["topics"] and log["topics"][0] == transfer_topic:
-            token_address = log["address"]
-            token_addresses.add(token_address)
-
-    return [(tx_hash, token_address) for token_address in token_addresses]
-
-
 def main() -> None:
     """main function for finding imbalance for a single tx hash."""
     tx_hash = input("Enter transaction hash: ")
