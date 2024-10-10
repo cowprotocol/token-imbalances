@@ -1,7 +1,5 @@
 dune-client
 moralis
-pandas
-pandas-stubs
 psycopg
 python-dotenv
 requests
