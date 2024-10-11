@@ -139,7 +139,7 @@ class TransactionProcessor:
             self.db.write_transaction_tokens(transaction_tokens)
 
             # update token decimals
-            update_token_decimals(self.db.engine, self.blockchain_data.web3)
+            update_token_decimals(self.db, self.blockchain_data)
 
             # get prices
             prices_new = self.get_prices_for_tokens(
