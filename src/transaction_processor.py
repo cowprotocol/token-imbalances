@@ -50,44 +50,36 @@ class TransactionProcessor:
         If no entries are present, fallback to get_finalized_block_number().
         """
         try:
-            # 1) get last transaction from DB
+            # 1) get latest block on chain
+            block_number_latest = self.blockchain_data.get_latest_block()
+            # 2) get last transaction from DB
             latest_tx_hash = self.db.get_latest_transaction()
-            # 2) get block of that transaction
+            # 3) get block of that transaction
             if latest_tx_hash:
-                block_number = int(
+                block_number_db = int(
                     self.blockchain_data.web3.eth.get_transaction_receipt(
                         HexBytes(latest_tx_hash)
                     )["blockNumber"]
                 )
+                if block_number_db < block_number_latest - 7200:
+                    #  TODO: Remove this rule before moving to production.
+                    logger.warning(
+                        "Only old transactions found in database, latest was on block"
+                        f"{block_number_db}. Using recent block instead."
+                    )
+                    start_block = block_number_latest
+                else:
+                    start_block = block_number_db + 1
             else:
                 logger.warning(
-                    f"No transaction found in database. Using recent block instead."
+                    "No transaction found in database. Using recent block instead."
                 )
-                block_number = self.blockchain_data.get_latest_block()
-            return block_number + 1
-
-            # # Query for the maximum block number
-            # query_max_block = read_sql_file("src/sql/select_max_block.sql")
-            # result = self.db.execute_query(
-            #     query_max_block, {"chain_name": self.chain_name}
-            # )
-            # row = result.fetchone()
-            # max_block = row[0] if row is not None else None
-            # blockchain_latest_block = self.blockchain_data.get_latest_block()
-            #
-            # # If no entries present, fallback to get_latest_block()
-            # if max_block is None:
-            #     return blockchain_latest_block
-            #
-            # logger.info("Fetched max block number from database: %d", max_block)
-            # if max_block > blockchain_latest_block - 7200:
-            #     return max_block + 1
-            # else:
-            #     #  TODO: Remove this rule before moving to production.
-            #     return blockchain_latest_block
+                start_block = block_number_latest
         except Exception as e:
-            logger.error("Error fetching start block from database: %s", e)
+            logger.error(f"Error fetching start block: {e}")
             raise
+
+        return start_block
 
     def process(self, start_block: int) -> None:
         """Main Daemon loop that finds imbalances for txs and prices."""
