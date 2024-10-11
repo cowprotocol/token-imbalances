@@ -37,6 +37,9 @@ class MoralisPriceProvider(AbstractPriceProvider):
         Price returned is closest to and at least as large as block timestamp.
         """
         try:
+            if os.getenv("MORALIS_API_KEY") is None:
+                self.logger.warning("Moralis API key is not set.")
+                return None
             token_address, block_number = extract_params(price_params, is_block=True)
             params = {
                 "chain": "eth",
