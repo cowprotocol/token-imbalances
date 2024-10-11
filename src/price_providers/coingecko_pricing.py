@@ -75,9 +75,12 @@ class CoingeckoPriceProvider(AbstractPriceProvider):
             self.last_reload_time = (
                 time.time()
             )  # update the last reload time to current time
-        for token in self.filtered_token_list:
-            if token["platforms"].get("ethereum") == token_address:
-                return token["id"]
+        if (
+            self.filtered_token_list is not None
+        ):  # TODO: handle missing keys more systematically
+            for token in self.filtered_token_list:
+                if token["platforms"].get("ethereum") == token_address:
+                    return token["id"]
         return None
 
     def fetch_api_price(
