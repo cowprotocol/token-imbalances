@@ -8,7 +8,7 @@ from src.helpers.database import Database
 
 def tests_write_transaction_timestamp():
     engine = create_engine(
-        f"postgresql+psycopg://postgres:postgres@localhost:5432/mainnet"
+        "postgresql+psycopg://postgres:postgres@localhost:5432/mainnet"
     )
     db = Database(engine, "mainnet")
     # truncate table

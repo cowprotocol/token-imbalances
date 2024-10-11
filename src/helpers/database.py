@@ -212,22 +212,16 @@ class Database:
 
         # Define the table without creating a model class
         token_decimals_table = Table(
-            "token_decimals",
-            MetaData(),
-            Column("token_address", LargeBinary, primary_key=True),
-            Column("decimals", Integer, nullable=False),
+            "token_decimals", MetaData(), autoload_with=self.engine
         )
 
         # Prepare the data
-        values = [
+        records = [
             {"token_address": bytes.fromhex(token_address[2:]), "decimals": decimals}
             for token_address, decimals in token_decimals
         ]
 
-        # Create the insert statement
-        stmt = insert(token_decimals_table).values(values)
-
         # Execute the bulk insert
         with self.engine.connect() as conn:
-            conn.execute(stmt)
+            conn.execute(token_decimals_table.insert(), records)
             conn.commit()
