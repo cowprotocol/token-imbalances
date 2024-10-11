@@ -24,7 +24,9 @@ jobs:
       - uses: actions/checkout@v3
       - name: Initialize database
         run: |
-          psql -h localhost -U postgres -d mainnet -f ${{ github.workspace }}/database/01_table_creation.sql
+          for file in ${{ github.workspace }}/database/*.sql; do
+            psql -h localhost -U postgres -d mainnet -f "$file"
+          done
         env:
           PGPASSWORD: postgres
       - name: Setup Python 3.12
