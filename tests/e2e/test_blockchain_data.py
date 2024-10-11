@@ -2,11 +2,7 @@ from os import getenv
 
 from web3 import Web3
 
-from src.helpers.blockchain_data import (
-    BlockchainData,
-    get_transaction_timestamp,
-    get_transaction_tokens,
-)
+from src.helpers.blockchain_data import BlockchainData
 
 
 def tests_get_tx_hashes_blocks():
@@ -23,18 +19,20 @@ def tests_get_tx_hashes_blocks():
 
 def test_get_transaction_timestamp():
     web3 = Web3(Web3.HTTPProvider(getenv("NODE_URL")))
+    blockchain = BlockchainData(web3)
     tx_hash = "0xb75e03b63d4f06c56549effd503e1e37f3ccfc3c00e6985a5aacc9b0534d7c5c"
 
-    transaction_timestamp = get_transaction_timestamp(tx_hash, web3)
+    transaction_timestamp = blockchain.get_transaction_timestamp(tx_hash)
 
     assert transaction_timestamp == (tx_hash, 1728044411)
 
 
 def test_get_transaction_tokens():
     web3 = Web3(Web3.HTTPProvider(getenv("NODE_URL")))
+    blockchain = BlockchainData(web3)
     tx_hash = "0xb75e03b63d4f06c56549effd503e1e37f3ccfc3c00e6985a5aacc9b0534d7c5c"
 
-    transaction_tokens = get_transaction_tokens(tx_hash, web3)
+    transaction_tokens = blockchain.get_transaction_tokens(tx_hash)
 
     assert all(h == tx_hash for h, _ in transaction_tokens)
     assert set(token_address for _, token_address in transaction_tokens) == {

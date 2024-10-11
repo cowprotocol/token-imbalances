@@ -4,11 +4,7 @@ from hexbytes import HexBytes
 from web3 import Web3
 
 from src.fees.compute_fees import compute_all_fees_of_batch
-from src.helpers.blockchain_data import (
-    BlockchainData,
-    get_transaction_timestamp,
-    get_transaction_tokens,
-)
+from src.helpers.blockchain_data import BlockchainData
 from src.helpers.config import CHAIN_SLEEP_TIME, logger
 from src.helpers.database import Database
 from src.helpers.helper_functions import read_sql_file, set_params
@@ -131,16 +127,14 @@ class TransactionProcessor:
         self.log_message = []
         try:
             # get transaction timestamp
-            transaction_timestamp = get_transaction_timestamp(
-                tx_hash, self.blockchain_data.web3
+            transaction_timestamp = self.blockchain_data.get_transaction_timestamp(
+                tx_hash
             )
             # store transaction timestamp
             self.db.write_transaction_timestamp(transaction_timestamp)
 
             # get transaction tokens
-            transaction_tokens = get_transaction_tokens(
-                tx_hash, self.blockchain_data.web3
-            )
+            transaction_tokens = self.blockchain_data.get_transaction_tokens(tx_hash)
             # store transaction tokens
             self.db.write_transaction_tokens(transaction_tokens)
 
