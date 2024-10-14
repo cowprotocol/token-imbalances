@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from hexbytes import HexBytes
 import psycopg
@@ -142,7 +142,9 @@ class Database:
             query,
             {
                 "tx_hash": bytes.fromhex(transaction_timestamp[0][2:]),
-                "time": datetime.fromtimestamp(transaction_timestamp[1]),
+                "time": datetime.fromtimestamp(
+                    transaction_timestamp[1], tz=timezone.utc
+                ),
             },
         )
 
