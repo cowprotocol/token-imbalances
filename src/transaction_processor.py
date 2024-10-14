@@ -118,6 +118,11 @@ class TransactionProcessor:
         """Function processes a single tx to find imbalances, fees, prices including writing to database."""
         self.log_message = []
         try:
+            # compute raw token imbalances
+            token_imbalances = self.process_token_imbalances(
+                tx_hash, auction_id, block_number
+            )
+
             # get transaction timestamp
             transaction_timestamp = self.blockchain_data.get_transaction_timestamp(
                 tx_hash
@@ -126,8 +131,12 @@ class TransactionProcessor:
             self.db.write_transaction_timestamp(transaction_timestamp)
 
             # get transaction tokens
-            transaction_tokens = self.blockchain_data.get_transaction_tokens(tx_hash)
+            # transaction_tokens = self.blockchain_data.get_transaction_tokens(tx_hash)
             # store transaction tokens
+            transaction_tokens = []
+            for token_address, imbalance in token_imbalances.items():
+                if imbalance != 0:
+                    transaction_tokens.append((tx_hash, token_address))
             self.db.write_transaction_tokens(transaction_tokens)
 
             # update token decimals
@@ -141,50 +150,50 @@ class TransactionProcessor:
             self.db.write_prices_new(prices_new)
 
             # Compute Raw Token Imbalances
-            if self.process_imbalances:
-                token_imbalances = self.process_token_imbalances(
-                    tx_hash, auction_id, block_number
-                )
+            # if self.process_imbalances:
+            #     token_imbalances = self.process_token_imbalances(
+            #         tx_hash, auction_id, block_number
+            #     )
 
-            # Compute Fees
-            if self.process_fees:
-                (
-                    protocol_fees,
-                    partner_fees,
-                    network_fees,
-                ) = self.process_fees_for_transaction(tx_hash)
+            # # Compute Fees
+            # if self.process_fees:
+            #     (
+            #         protocol_fees,
+            #         partner_fees,
+            #         network_fees,
+            #     ) = self.process_fees_for_transaction(tx_hash)
 
-            # Compute Prices
-            if self.process_prices and self.process_imbalances:
-                prices = self.process_prices_for_tokens(
-                    token_imbalances, block_number, tx_hash
-                )
+            # # Compute Prices
+            # if self.process_prices and self.process_imbalances:
+            #     prices = self.process_prices_for_tokens(
+            #         token_imbalances, block_number, tx_hash
+            #     )
 
             # Write to database iff no errors in either computations
-            if (
-                (not self.process_imbalances)
-                and (not self.process_fees)
-                and (not self.process_prices)
-            ):
-                return
+            # if (
+            #     (not self.process_imbalances)
+            #     and (not self.process_fees)
+            #     and (not self.process_prices)
+            # ):
+            #     return
 
             if self.process_imbalances and token_imbalances:
                 self.handle_imbalances(
                     token_imbalances, tx_hash, auction_id, block_number
                 )
 
-            if self.process_fees:
-                self.handle_fees(
-                    protocol_fees,
-                    partner_fees,
-                    network_fees,
-                    auction_id,
-                    block_number,
-                    tx_hash,
-                )
+            # if self.process_fees:
+            #     self.handle_fees(
+            #         protocol_fees,
+            #         partner_fees,
+            #         network_fees,
+            #         auction_id,
+            #         block_number,
+            #         tx_hash,
+            #     )
 
-            if self.process_prices and prices:
-                self.handle_prices(prices, tx_hash, block_number)
+            # if self.process_prices and prices:
+            #     self.handle_prices(prices, tx_hash, block_number)
 
             logger.info("\n".join(self.log_message))
 
