@@ -177,7 +177,7 @@ class Database:
                     query,
                     {
                         "token_address": bytes.fromhex(token_address[2:]),
-                        "time": datetime.fromtimestamp(time),
+                        "time": datetime.fromtimestamp(time, tz=timezone.utc),
                         "price": price,
                         "source": source,
                     },
