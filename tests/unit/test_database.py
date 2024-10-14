@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from hexbytes import HexBytes
 from sqlalchemy import create_engine, text
@@ -31,12 +31,7 @@ def tests_write_transaction_timestamp():
         "0x" + bytes(res[0]).hex()
         == "0xb75e03b63d4f06c56549effd503e1e37f3ccfc3c00e6985a5aacc9b0534d7c5c"
     )
-    unix_timestamp = (
-        datetime.datetime.strptime(res[1], "%Y-%m-%d %H:%M:%S")
-        .replace(tzinfo=datetime.timezone.utc)
-        .timestamp()
-    )
-    assert unix_timestamp == 1728044411
+    assert res[1].replace(tzinfo=timezone.utc).timestamp() == 1728044411
 
 
 def tests_write_transaction_tokens():
