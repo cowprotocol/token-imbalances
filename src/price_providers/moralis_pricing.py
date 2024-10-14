@@ -1,11 +1,14 @@
+import os
+
+from dotenv import load_dotenv
 from moralis import evm_api
+
 from src.helpers.config import get_logger
-import os, dotenv
 from src.price_providers.pricing_model import AbstractPriceProvider
 from src.helpers.helper_functions import extract_params
 
 
-dotenv.load_dotenv()
+load_dotenv()
 
 
 class MoralisPriceProvider(AbstractPriceProvider):
@@ -18,7 +21,7 @@ class MoralisPriceProvider(AbstractPriceProvider):
 
     @property
     def name(self) -> str:
-        return "Moralis"
+        return "moralis"
 
     @staticmethod
     def wei_to_eth(price: str) -> float | None:
@@ -34,6 +37,9 @@ class MoralisPriceProvider(AbstractPriceProvider):
         Price returned is closest to and at least as large as block timestamp.
         """
         try:
+            if os.getenv("MORALIS_API_KEY") is None:
+                self.logger.warning("Moralis API key is not set.")
+                return None
             token_address, block_number = extract_params(price_params, is_block=True)
             params = {
                 "chain": "eth",

@@ -1,5 +1,10 @@
-from sqlalchemy import text
+from datetime import datetime
+
+from hexbytes import HexBytes
+import psycopg
+from sqlalchemy import text, insert, Table, Column, Integer, LargeBinary, MetaData
 from sqlalchemy.engine import Engine
+
 from src.helpers.config import check_db_connection, logger
 from src.helpers.helper_functions import read_sql_file
 from src.constants import NULL_ADDRESS_STRING
@@ -124,3 +129,99 @@ class Database:
                 "fee_recipient": final_recipient,
             },
         )
+
+    def write_transaction_timestamp(
+        self, transaction_timestamp: tuple[str, int]
+    ) -> None:
+        """Writes the transaction timestamp to database."""
+        query = (
+            "INSERT INTO transaction_timestamp (tx_hash, time) "
+            "VALUES (:tx_hash, :time);"
+        )
+        self.execute_and_commit(
+            query,
+            {
+                "tx_hash": bytes.fromhex(transaction_timestamp[0][2:]),
+                "time": datetime.fromtimestamp(transaction_timestamp[1]),
+            },
+        )
+
+    def write_transaction_tokens(
+        self, transaction_tokens: list[tuple[str, str]]
+    ) -> None:
+        """Writes the transaction tokens to the database."""
+        query = (
+            "INSERT INTO transaction_tokens (tx_hash, token_address) "
+            "VALUES (:tx_hash, :token_address);"
+        )
+        for tx_hash, token_address in transaction_tokens:
+            self.execute_and_commit(
+                query,
+                {
+                    "tx_hash": bytes.fromhex(tx_hash[2:]),
+                    "token_address": bytes.fromhex(token_address[2:]),
+                },
+            )
+
+    def write_prices_new(self, prices: list[tuple[str, int, float, str]]) -> None:
+        """Write prices to database."""
+        query = (
+            "INSERT INTO prices (token_address, time, price, source) "
+            "VALUES (:token_address, :time, :price, :source);"
+        )
+        for token_address, time, price, source in prices:
+            try:
+                self.execute_and_commit(
+                    query,
+                    {
+                        "token_address": bytes.fromhex(token_address[2:]),
+                        "time": datetime.fromtimestamp(time),
+                        "price": price,
+                        "source": source,
+                    },
+                )
+            except psycopg.errors.NumericValueOutOfRange:
+                logger.warning(
+                    f"Error while writing price data. token: {token_address}, "
+                    f"time: {time}, price: {price}, source: {source}"
+                )
+
+    def get_latest_transaction(self) -> str | None:
+        """Get latest transaction hash.
+        If no transaction is found, return None."""
+        query = "SELECT tx_hash FROM transaction_timestamp ORDER BY time DESC LIMIT 1;"
+        result = self.execute_query(query, {}).fetchone()
+
+        if result is None:
+            return None
+
+        latest_tx_hash = HexBytes(result[0]).to_0x_hex()
+        return latest_tx_hash
+
+    def get_tokens_without_decimals(self) -> list[str]:
+        """Get tokens without decimals."""
+        query = (
+            "SELECT token_address FROM transaction_tokens "
+            "WHERE token_address not in (SELECT token_address FROM token_decimals);"
+        )
+        result = self.execute_query(query, {}).fetchall()
+        return list({HexBytes(row[0]).to_0x_hex() for row in result})
+
+    def write_token_decimals(self, token_decimals: list[tuple[str, int]]) -> None:
+        self.engine = check_db_connection(self.engine, "solver_slippage")
+
+        # Define the table without creating a model class
+        token_decimals_table = Table(
+            "token_decimals", MetaData(), autoload_with=self.engine
+        )
+
+        # Prepare the data
+        records = [
+            {"token_address": bytes.fromhex(token_address[2:]), "decimals": decimals}
+            for token_address, decimals in token_decimals
+        ]
+
+        # Execute the bulk insert
+        with self.engine.connect() as conn:
+            conn.execute(token_decimals_table.insert(), records)
+            conn.commit()

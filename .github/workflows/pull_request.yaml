@@ -6,8 +6,29 @@ on:
 jobs:
   python:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: mainnet
+        # Set health checks to wait until postgres has started
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
     steps:
       - uses: actions/checkout@v3
+      - name: Initialize database
+        run: |
+          for file in ${{ github.workspace }}/database/*.sql; do
+            psql -h localhost -U postgres -d mainnet -f "$file"
+          done
+        env:
+          PGPASSWORD: postgres
       - name: Setup Python 3.12
         uses: actions/setup-python@v3
         with:
@@ -26,7 +47,8 @@ jobs:
       - name: Type Check (mypy)
         run: mypy src
       - name: Tests
-        run: pytest tests/e2e/test_blockchain_data.py tests/e2e/test_imbalances_script.py
+        run: pytest tests/unit/ tests/e2e/
         env:
           NODE_URL: ${{ secrets.NODE_URL }}
+          SOLVER_SLIPPAGE_DB_URL: postgres:postgres@localhost:5432/mainnet
           CHAIN_SLEEP_TIME: 1

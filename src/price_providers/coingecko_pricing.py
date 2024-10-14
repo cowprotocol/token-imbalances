@@ -1,8 +1,9 @@
 import os
 import time
+
 import requests
-import json
 from web3 import Web3
+
 from src.price_providers.pricing_model import AbstractPriceProvider
 from src.helpers.config import logger, get_web3_instance
 from src.helpers.helper_functions import get_finalized_block_number, extract_params
@@ -29,13 +30,16 @@ class CoingeckoPriceProvider(AbstractPriceProvider):
 
     @property
     def name(self) -> str:
-        return "Coingecko"
+        return "coingecko"
 
-    def fetch_coingecko_list(self) -> list[dict]:
+    def fetch_coingecko_list(self) -> list[dict] | None:
         """
         Fetch and filter the list of tokens (currently filters only Ethereum)
         from the Coingecko API.
         """
+        if not coingecko_api_key:
+            logger.warning("Coingecko API key is not set.")
+            return None
         url = (
             f"https://pro-api.coingecko.com/api/v3/coins/"
             f"list?include_platform=true&status=active"
@@ -47,7 +51,7 @@ class CoingeckoPriceProvider(AbstractPriceProvider):
             headers["x-cg-pro-api-key"] = coingecko_api_key
 
         response = requests.get(url, headers=headers)
-        tokens_list = json.loads(response.text)
+        tokens_list = response.json()
         return [
             {"id": item["id"], "platforms": {"ethereum": item["platforms"]["ethereum"]}}
             for item in tokens_list
@@ -71,9 +75,12 @@ class CoingeckoPriceProvider(AbstractPriceProvider):
             self.last_reload_time = (
                 time.time()
             )  # update the last reload time to current time
-        for token in self.filtered_token_list:
-            if token["platforms"].get("ethereum") == token_address:
-                return token["id"]
+        if (
+            self.filtered_token_list is not None
+        ):  # TODO: handle missing keys more systematically
+            for token in self.filtered_token_list:
+                if token["platforms"].get("ethereum") == token_address:
+                    return token["id"]
         return None
 
     def fetch_api_price(
@@ -82,9 +89,6 @@ class CoingeckoPriceProvider(AbstractPriceProvider):
         """
         Makes call to Coingecko API to fetch price, between a start and end timestamp.
         """
-        if not coingecko_api_key:
-            logger.warning("Coingecko API key is not set.")
-            return None
         # price of token is returned in ETH
         url = (
             f"https://pro-api.coingecko.com/api/v3/coins/{token_id}/market_chart/range"
@@ -122,6 +126,9 @@ class CoingeckoPriceProvider(AbstractPriceProvider):
         Function returns coingecko price for a token address,
         closest to and at least as large as the block timestamp for a given tx hash.
         """
+        if not coingecko_api_key:
+            logger.warning("Coingecko API key is not set.")
+            return None
         token_address, block_number = extract_params(price_params, is_block=True)
         block_start_timestamp = self.web3.eth.get_block(block_number)["timestamp"]
         if self.price_not_retrievable(block_start_timestamp):

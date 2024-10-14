@@ -1,5 +1,8 @@
 from hexbytes import HexBytes
 from web3 import Web3
+from web3.types import HexStr
+
+from contracts.erc20_abi import erc20_abi
 from src.helpers.config import logger
 from src.constants import SETTLEMENT_CONTRACT_ADDRESS, INVALIDATED_ORDER_TOPIC
 
@@ -71,3 +74,31 @@ class BlockchainData:
         # convert bytes to int
         auction_id = int.from_bytes(call_data_bytes[-8:], byteorder="big")
         return auction_id
+
+    def get_transaction_timestamp(self, tx_hash: str) -> tuple[str, int]:
+        receipt = self.web3.eth.get_transaction_receipt(HexStr(tx_hash))
+        block_number = receipt["blockNumber"]
+        block = self.web3.eth.get_block(block_number)
+        timestamp = block["timestamp"]
+
+        return tx_hash, timestamp
+
+    def get_transaction_tokens(self, tx_hash: str) -> list[tuple[str, str]]:
+        receipt = self.web3.eth.get_transaction_receipt(HexStr(tx_hash))
+
+        transfer_topic = self.web3.keccak(text="Transfer(address,address,uint256)")
+
+        token_addresses: set[str] = set()
+        for log in receipt["logs"]:
+            if log["topics"] and log["topics"][0] == transfer_topic:
+                token_address = log["address"]
+                token_addresses.add(token_address)
+
+        return [(tx_hash, token_address) for token_address in token_addresses]
+
+    def get_token_decimals(self, token_address: str) -> int:
+        """Get number of decimals for a token."""
+        contract = self.web3.eth.contract(
+            address=Web3.to_checksum_address(token_address), abi=erc20_abi
+        )
+        return contract.functions.decimals().call()

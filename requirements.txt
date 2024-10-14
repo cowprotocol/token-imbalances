@@ -116,19 +116,11 @@ mypy-extensions==1.0.0
     #   typing-inspect
 ndjson==0.3.1
     # via dune-client
-numpy==1.26.4
-    # via
-    #   pandas
-    #   pandas-stubs
 packaging==24.1
     # via
     #   black
     #   marshmallow
     #   pytest
-pandas==2.2.1
-    # via -r requirements.in
-pandas-stubs==2.2.2.240909
-    # via -r requirements.in
 parsimonious==0.10.0
     # via eth-abi
 pathspec==0.12.1
@@ -139,7 +131,7 @@ platformdirs==4.3.6
     #   pylint
 pluggy==1.5.0
     # via pytest
-psycopg2==2.9.9
+psycopg==3.2.3
     # via -r requirements.in
 pycryptodome==3.20.0
     # via
@@ -159,11 +151,8 @@ python-dateutil==2.9.0.post0
     # via
     #   dune-client
     #   moralis
-    #   pandas
 python-dotenv==1.0.0
     # via -r requirements.in
-pytz==2024.2
-    # via pandas
 pyunormalize==16.0.0
     # via web3
 regex==2024.9.11
@@ -187,12 +176,8 @@ toolz==0.12.1
     # via cytoolz
 types-deprecated==1.2.9.20240311
     # via dune-client
-types-psycopg2==2.9.21.20240819
-    # via -r requirements.in
 types-python-dateutil==2.9.0.20240906
     # via dune-client
-types-pytz==2024.2.0.20240913
-    # via pandas-stubs
 types-pyyaml==6.0.12.20240917
     # via dune-client
 types-requests==2.32.0.20240914
@@ -207,6 +192,7 @@ typing-extensions==4.12.2
     #   eth-typing
     #   moralis
     #   mypy
+    #   psycopg
     #   pydantic
     #   pydantic-core
     #   sqlalchemy
@@ -214,8 +200,6 @@ typing-extensions==4.12.2
     #   web3
 typing-inspect==0.9.0
     # via dataclasses-json
-tzdata==2024.1
-    # via pandas
 urllib3==2.2.3
     # via
     #   moralis

@@ -1,13 +1,16 @@
 import requests
+
 from src.price_providers.pricing_model import AbstractPriceProvider
-from src.helpers.config import logger
-from src.helpers.helper_functions import extract_params, get_token_decimals
+from src.helpers.blockchain_data import BlockchainData
+from src.helpers.config import get_web3_instance, logger
+from src.helpers.helper_functions import extract_params
 
 
 class AuctionPriceProvider(AbstractPriceProvider):
     """Fetch auction prices."""
 
     def __init__(self) -> None:
+        self.blockchain = BlockchainData(get_web3_instance())
         self.endpoint_urls = {
             "prod": f"https://api.cow.fi/mainnet/api/v1/solver_competition/by_tx_hash/",
             "barn": f"https://barn.api.cow.fi/mainnet/api/v1/solver_competition/by_tx_hash/",
@@ -15,7 +18,7 @@ class AuctionPriceProvider(AbstractPriceProvider):
 
     @property
     def name(self) -> str:
-        return "AuctionPrices"
+        return "native"
 
     def get_price(self, price_params: dict) -> float | None:
         """Function returns Auction price from endpoint for a token address."""
@@ -39,7 +42,7 @@ class AuctionPriceProvider(AbstractPriceProvider):
                     return None
                 # calculation for converting auction price from endpoint to ETH equivalent per token unit
                 price_in_eth = (float(price) / 10**18) * (
-                    10 ** get_token_decimals(token_address) / 10**18
+                    10 ** self.blockchain.get_token_decimals(token_address) / 10**18
                 )
                 return price_in_eth
 

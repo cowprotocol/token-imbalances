@@ -51,7 +51,7 @@ def create_db_connection(db_type: str) -> Engine:
     if not db_url:
         raise ValueError(f"{db_type} database URL not found in environment variables.")
 
-    return create_engine(f"postgresql+psycopg2://{db_url}")
+    return create_engine(f"postgresql+psycopg://{db_url}")
 
 
 def check_db_connection(engine: Engine, db_type: str) -> Engine:
