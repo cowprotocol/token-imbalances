@@ -173,11 +173,17 @@ class Database:
         )
         for token_address, time, price, source in prices:
             try:
+                date_time = datetime.fromtimestamp(time, tz=timezone.utc)
+                check_existence_query = f"SELECT * FROM prices WHERE token_address = '\\{token_address[1:]}' and time = '{date_time}' and source = '{source}'"
+                result = self.execute_query(check_existence_query, {}).fetchone()
+                if result is not None:
+                    continue
+
                 self.execute_and_commit(
                     query,
                     {
                         "token_address": bytes.fromhex(token_address[2:]),
-                        "time": datetime.fromtimestamp(time, tz=timezone.utc),
+                        "time": date_time,
                         "price": price,
                         "source": source,
                     },

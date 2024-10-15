@@ -119,9 +119,7 @@ class TransactionProcessor:
         self.log_message = []
         try:
             # compute raw token imbalances
-            token_imbalances = self.process_token_imbalances(
-                tx_hash, auction_id, block_number
-            )
+            token_imbalances = self.process_token_imbalances(tx_hash)
 
             # get transaction timestamp
             transaction_timestamp = self.blockchain_data.get_transaction_timestamp(
@@ -134,9 +132,8 @@ class TransactionProcessor:
             # transaction_tokens = self.blockchain_data.get_transaction_tokens(tx_hash)
             # store transaction tokens
             transaction_tokens = []
-            for token_address, imbalance in token_imbalances.items():
-                if imbalance != 0:
-                    transaction_tokens.append((tx_hash, token_address))
+            for token_address in token_imbalances.keys():
+                transaction_tokens.append((tx_hash, token_address))
             self.db.write_transaction_tokens(transaction_tokens)
 
             # update token decimals
@@ -202,7 +199,8 @@ class TransactionProcessor:
             return
 
     def process_token_imbalances(
-        self, tx_hash: str, auction_id: int, block_number: int
+        self,
+        tx_hash: str,
     ) -> dict[str, int]:
         """Process token imbalances for a given transaction and return imbalances."""
         try:
