@@ -83,19 +83,6 @@ class BlockchainData:
 
         return tx_hash, timestamp
 
-    def get_transaction_tokens(self, tx_hash: str) -> list[tuple[str, str]]:
-        receipt = self.web3.eth.get_transaction_receipt(HexStr(tx_hash))
-
-        transfer_topic = self.web3.keccak(text="Transfer(address,address,uint256)")
-
-        token_addresses: set[str] = set()
-        for log in receipt["logs"]:
-            if log["topics"] and log["topics"][0] == transfer_topic:
-                token_address = log["address"]
-                token_addresses.add(token_address)
-
-        return [(tx_hash, token_address) for token_address in token_addresses]
-
     def get_token_decimals(self, token_address: str) -> int:
         """Get number of decimals for a token."""
         contract = self.web3.eth.contract(

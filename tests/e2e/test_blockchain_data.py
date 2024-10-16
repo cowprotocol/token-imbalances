@@ -32,7 +32,10 @@ def test_get_transaction_tokens():
     blockchain = BlockchainData(web3)
     tx_hash = "0xb75e03b63d4f06c56549effd503e1e37f3ccfc3c00e6985a5aacc9b0534d7c5c"
 
-    transaction_tokens = blockchain.get_transaction_tokens(tx_hash)
+    token_imbalances = blockchain.process_token_imbalances(tx_hash)
+    transaction_tokens = []
+    for token_address in token_imbalances.keys():
+        transaction_tokens.append((tx_hash, token_address))
 
     assert all(h == tx_hash for h, _ in transaction_tokens)
     assert set(token_address for _, token_address in transaction_tokens) == {
