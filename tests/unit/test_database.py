@@ -86,11 +86,44 @@ def tests_write_prices():
             0.000000050569218629,
             "moralis",
         ),
+    ]
+    # truncate table
+    with engine.connect() as conn:
+        conn.execute(text("TRUNCATE prices"))
+        conn.commit()
+    # write data
+    db.write_prices_new(token_prices)
+    # read data
+    with engine.connect() as conn:
+        res = conn.execute(
+            text("SELECT token_address, time, price, source FROM prices")
+        ).all()
+    # cleaning up the duplicate entry
+    for i, (token_address, time, price, source) in enumerate(token_prices):
+        assert HexBytes(res[i][0]) == HexBytes(token_address)
+        assert res[i][1].replace(tzinfo=timezone.utc).timestamp() == time
+        assert float(res[i][2]) == price
+        assert res[i][3] == source
+
+
+def tests_write_duplicate_prices():
+    engine = create_engine(
+        f"postgresql+psycopg://postgres:postgres@localhost:5432/mainnet"
+    )
+    db = Database(engine, "mainnet")
+    # list contains duplicate entry in order to test how this is handled
+    token_prices = [
         (
-            "0x68BBED6A47194EFF1CF514B50EA91895597FC91E",
-            int(datetime.fromisoformat("2024-10-10 16:49:47.000000").timestamp()),
-            0.000000050569218629,
-            "moralis",
+            "0xA0B86991C6218B36C1D19D4A2E9EB0CE3606EB48",
+            int(datetime.fromisoformat("2024-10-10 16:48:47.000000").timestamp()),
+            0.000420454193230350,
+            "coingecko",
+        ),
+        (
+            "0xA0B86991C6218B36C1D19D4A2E9EB0CE3606EB48",
+            int(datetime.fromisoformat("2024-10-10 16:48:47.000000").timestamp()),
+            0.000420454193230350,
+            "coingecko",
         ),
     ]
     # truncate table
@@ -105,10 +138,10 @@ def tests_write_prices():
             text("SELECT token_address, time, price, source FROM prices")
         ).all()
     # cleaning up the duplicate entry
-    token_prices = token_prices[:2]
+    token_prices = token_prices[:1]
     for i, (token_address, time, price, source) in enumerate(token_prices):
         assert HexBytes(res[i][0]) == HexBytes(token_address)
-        assert res[i][1].timestamp() == time
+        assert res[i][1].replace(tzinfo=timezone.utc).timestamp() == time
         assert float(res[i][2]) == price
         assert res[i][3] == source
 
