@@ -8,9 +8,9 @@ from src.helpers.blockchain_data import BlockchainData
 def main() -> None:
     # valid chain names: mainnet, xdai, arbitrum_one
     chain_name = os.getenv("CHAIN_NAME")
-    process_imbalances = os.getenv("PROCESS_IMBALANCES", True)
-    process_prices = os.getenv("PROCESS_PRICES", False)
-    process_fees = os.getenv("PROCESS_FEES", False)
+    process_imbalances = os.getenv("PROCESS_IMBALANCES", "True") == "True"
+    process_prices = os.getenv("PROCESS_PRICES", "False") == "True"
+    process_fees = os.getenv("PROCESS_FEES", "False") == "True"
 
     if chain_name is None:
         logger.error("CHAIN_NAME environment variable is not set.")
