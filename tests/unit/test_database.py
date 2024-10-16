@@ -72,7 +72,6 @@ def tests_write_prices():
         f"postgresql+psycopg://postgres:postgres@localhost:5432/mainnet"
     )
     db = Database(engine, "mainnet")
-    # list contains duplicate entry in order to test how this is handled
     token_prices = [
         (
             "0xA0B86991C6218B36C1D19D4A2E9EB0CE3606EB48",
