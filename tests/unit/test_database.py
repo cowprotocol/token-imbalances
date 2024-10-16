@@ -72,6 +72,7 @@ def tests_write_prices():
         f"postgresql+psycopg://postgres:postgres@localhost:5432/mainnet"
     )
     db = Database(engine, "mainnet")
+    # list contains duplicate entry in order to test how this is handled
     token_prices = [
         (
             "0xA0B86991C6218B36C1D19D4A2E9EB0CE3606EB48",
@@ -103,6 +104,8 @@ def tests_write_prices():
         res = conn.execute(
             text("SELECT token_address, time, price, source FROM prices")
         ).all()
+    # cleaning up the duplicate entry
+    token_prices = token_prices[:2]
     for i, (token_address, time, price, source) in enumerate(token_prices):
         assert HexBytes(res[i][0]) == HexBytes(token_address)
         assert res[i][1].timestamp() == time
