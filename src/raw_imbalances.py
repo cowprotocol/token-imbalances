@@ -121,21 +121,29 @@ class RawTokenImbalances:
                     actions.append(dict(action))
         return actions
 
-    def calculate_native_eth_imbalance(self, actions: list[dict], address: str) -> int:
+    def calculate_native_eth_imbalance(
+        self, actions: list[dict], address: str
+    ) -> int | None:
         """Extract ETH imbalance from transfer actions."""
         # inflow is the total value transferred to address param
-        inflow = sum(
-            _to_int(action["value"])
-            for action in actions
-            if Web3.to_checksum_address(action.get("to", "")) == address
-        )
-        # outflow is the total value transferred out of address param
-        outflow = sum(
-            _to_int(action["value"])
-            for action in actions
-            if Web3.to_checksum_address(action.get("from", "")) == address
-        )
-        return inflow - outflow
+
+        native_eth_imbalance = 0
+        is_it_none = True
+        for action in actions:
+            flow = 0
+            if Web3.to_checksum_address(action.get("to", "")) == address:
+                flow = _to_int(action["value"])
+            else:
+                if Web3.to_checksum_address(action.get("from", "")) == address:
+                    flow = (-1) * _to_int(action["value"])
+            if flow != 0:
+                is_it_none = False
+                native_eth_imbalance += flow
+
+        if is_it_none:
+            return None
+        else:
+            return native_eth_imbalance
 
     def extract_events(self, tx_receipt: dict) -> dict[str, list[dict]]:
         """Extract relevant events from the transaction receipt."""
