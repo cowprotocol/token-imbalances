@@ -177,7 +177,9 @@ class Database:
                 check_existence_query = f"SELECT * FROM prices WHERE token_address = '\\{token_address[1:]}' and time = '{date_time}' and source = '{source}'"
                 result = self.execute_query(check_existence_query, {}).fetchone()
                 if result is not None:
-                    logger.info("Skipping INSERT operation as entry already exists in PRICES table.")
+                    logger.info(
+                        "Skipping INSERT operation as entry already exists in PRICES table."
+                    )
                     continue
 
                 self.execute_and_commit(
