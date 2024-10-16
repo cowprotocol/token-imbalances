@@ -16,10 +16,6 @@ def main() -> None:
     process_fees = False
     process_prices = True
 
-    web3, db_engine = initialize_connections()
-    blockchain = BlockchainData(web3)
-    db = Database(db_engine, chain_name)
-
     if chain_name == "arbitrum_one":
         process_imbalances = False
         process_prices = False
@@ -28,11 +24,10 @@ def main() -> None:
         process_prices = False
 
     processor = TransactionProcessor(
-        blockchain, db, chain_name, process_imbalances, process_fees, process_prices
+        chain_name, process_imbalances, process_fees, process_prices
     )
 
-    start_block = processor.get_start_block()
-    processor.process(start_block)
+    processor.run()
 
 
 if __name__ == "__main__":

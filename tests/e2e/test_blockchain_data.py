@@ -3,6 +3,7 @@ from os import getenv
 from web3 import Web3
 
 from src.helpers.blockchain_data import BlockchainData
+from src.raw_imbalances import RawTokenImbalances
 
 
 def tests_get_tx_hashes_blocks():
@@ -29,10 +30,10 @@ def test_get_transaction_timestamp():
 
 def test_get_transaction_tokens():
     web3 = Web3(Web3.HTTPProvider(getenv("NODE_URL")))
-    blockchain = BlockchainData(web3)
+    imbalances = RawTokenImbalances(web3, "mainnet")
     tx_hash = "0xb75e03b63d4f06c56549effd503e1e37f3ccfc3c00e6985a5aacc9b0534d7c5c"
 
-    transaction_tokens = blockchain.get_transaction_tokens(tx_hash)
+    transaction_tokens = imbalances.get_transaction_tokens(tx_hash)
 
     assert all(h == tx_hash for h, _ in transaction_tokens)
     assert set(token_address for _, token_address in transaction_tokens) == {

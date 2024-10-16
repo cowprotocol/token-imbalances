@@ -5,10 +5,10 @@ from web3 import Web3
 
 from src.fees.compute_fees import compute_all_fees_of_batch
 from src.helpers.blockchain_data import BlockchainData
-from src.helpers.config import CHAIN_SLEEP_TIME, logger
+from src.helpers.config import CHAIN_SLEEP_TIME, logger, initialize_connections
 from src.helpers.database import Database
-from src.helpers.helper_functions import read_sql_file, set_params
-from src.imbalances_script import RawTokenImbalances
+from src.helpers.helper_functions import set_params
+from src.raw_imbalances import RawTokenImbalances
 from src.price_providers.price_feed import PriceFeed
 from src.token_decimals import update_token_decimals
 
@@ -22,20 +22,19 @@ class TransactionProcessor:
 
     def __init__(
         self,
-        blockchain_data: BlockchainData,
-        db: Database,
         chain_name: str,
         process_imbalances: bool,
         process_fees: bool,
         process_prices: bool,
     ):
-        self.blockchain_data = blockchain_data
-        self.db = db
         self.chain_name = chain_name
         self.process_imbalances = process_imbalances
         self.process_fees = process_fees
         self.process_prices = process_prices
 
+        web3, db_engine = initialize_connections()
+        self.blockchain_data = BlockchainData(web3)
+        self.db = Database(db_engine, chain_name)
         self.imbalances = RawTokenImbalances(self.blockchain_data.web3, self.chain_name)
         self.price_providers = PriceFeed(activate=process_prices)
         self.log_message: list[str] = []
@@ -81,8 +80,11 @@ class TransactionProcessor:
 
         return start_block
 
-    def process(self, start_block: int) -> None:
-        """Main Daemon loop that finds imbalances for txs and prices."""
+    def run(self) -> None:
+        """Main Daemon loop that processes txs and computes imbalances,
+        relevant prices and fees, if needed."""
+
+        start_block = self.get_start_block()
         previous_block = start_block
         unprocessed_txs: list[tuple[str, int, int]] = []
         logger.info("%s daemon started. Start block: %d", self.chain_name, start_block)
@@ -118,11 +120,6 @@ class TransactionProcessor:
         """Function processes a single tx to find imbalances, fees, prices including writing to database."""
         self.log_message = []
         try:
-            # compute raw token imbalances
-            token_imbalances = self.process_token_imbalances(
-                tx_hash, auction_id, block_number
-            )
-
             # get transaction timestamp
             transaction_timestamp = self.blockchain_data.get_transaction_timestamp(
                 tx_hash
@@ -131,12 +128,8 @@ class TransactionProcessor:
             self.db.write_transaction_timestamp(transaction_timestamp)
 
             # get transaction tokens
-            # transaction_tokens = self.blockchain_data.get_transaction_tokens(tx_hash)
+            transaction_tokens = self.imbalances.get_transaction_tokens(tx_hash)
             # store transaction tokens
-            transaction_tokens = []
-            for token_address, imbalance in token_imbalances.items():
-                if imbalance != 0:
-                    transaction_tokens.append((tx_hash, token_address))
             self.db.write_transaction_tokens(transaction_tokens)
 
             # update token decimals
@@ -177,10 +170,12 @@ class TransactionProcessor:
             # ):
             #     return
 
-            if self.process_imbalances and token_imbalances:
-                self.handle_imbalances(
-                    token_imbalances, tx_hash, auction_id, block_number
-                )
+            if self.process_imbalances:
+                token_imbalances = self.imbalances.compute_token_imbalances(tx_hash)
+                if token_imbalances:
+                    self.handle_imbalances(
+                        token_imbalances, tx_hash, auction_id, block_number
+                    )
 
             # if self.process_fees:
             #     self.handle_fees(
@@ -200,21 +195,6 @@ class TransactionProcessor:
         except Exception as err:
             logger.error(f"An Error occurred: {err}")
             return
-
-    def process_token_imbalances(
-        self, tx_hash: str, auction_id: int, block_number: int
-    ) -> dict[str, int]:
-        """Process token imbalances for a given transaction and return imbalances."""
-        try:
-            token_imbalances = self.imbalances.compute_imbalances(tx_hash)
-            if token_imbalances:
-                self.log_message.append(
-                    f"Token Imbalances on {self.chain_name} for tx {tx_hash}:"
-                )
-            return token_imbalances
-        except Exception as e:
-            logger.error(f"Failed to compute imbalances for transaction {tx_hash}: {e}")
-            return {}
 
     def process_fees_for_transaction(
         self,
