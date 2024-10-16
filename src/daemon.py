@@ -8,25 +8,17 @@ from src.helpers.blockchain_data import BlockchainData
 def main() -> None:
     # valid chain names: mainnet, xdai, arbitrum_one
     chain_name = os.getenv("CHAIN_NAME")
+    process_imbalances = os.getenv("PROCESS_IMBALANCES", True)
+    process_prices = os.getenv("PROCESS_PRICES", False)
+    process_fees = os.getenv("PROCESS_FEES", False)
+
     if chain_name is None:
         logger.error("CHAIN_NAME environment variable is not set.")
         return
 
-    process_imbalances = True
-    process_fees = False
-    process_prices = True
-
-    if chain_name == "arbitrum_one":
-        process_imbalances = False
-        process_prices = False
-
-    if chain_name == "xdai":
-        process_prices = False
-
     processor = TransactionProcessor(
         chain_name, process_imbalances, process_fees, process_prices
     )
-
     processor.run()
 
 
