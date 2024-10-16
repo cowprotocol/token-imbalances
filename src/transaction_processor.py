@@ -118,11 +118,6 @@ class TransactionProcessor:
         """Function processes a single tx to find imbalances, fees, prices including writing to database."""
         self.log_message = []
         try:
-            # compute raw token imbalances
-            token_imbalances = self.process_token_imbalances(
-                tx_hash, auction_id, block_number
-            )
-
             # get transaction timestamp
             transaction_timestamp = self.blockchain_data.get_transaction_timestamp(
                 tx_hash
@@ -130,13 +125,12 @@ class TransactionProcessor:
             # store transaction timestamp
             self.db.write_transaction_timestamp(transaction_timestamp)
 
-            # get transaction tokens
-            # transaction_tokens = self.blockchain_data.get_transaction_tokens(tx_hash)
-            # store transaction tokens
+            # get transaction tokens by first computing raw token imbalances
+            token_imbalances = self.process_token_imbalances(tx_hash)
             transaction_tokens = []
-            for token_address, imbalance in token_imbalances.items():
-                if imbalance != 0:
-                    transaction_tokens.append((tx_hash, token_address))
+            for token_address in token_imbalances.keys():
+                transaction_tokens.append((tx_hash, token_address))
+            # store transaction tokens
             self.db.write_transaction_tokens(transaction_tokens)
 
             # update token decimals
@@ -202,7 +196,8 @@ class TransactionProcessor:
             return
 
     def process_token_imbalances(
-        self, tx_hash: str, auction_id: int, block_number: int
+        self,
+        tx_hash: str,
     ) -> dict[str, int]:
         """Process token imbalances for a given transaction and return imbalances."""
         try:
