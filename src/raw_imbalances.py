@@ -126,7 +126,6 @@ class RawTokenImbalances:
     ) -> int | None:
         """Extract ETH imbalance from transfer actions."""
         # inflow is the total value transferred to address param
-
         native_eth_imbalance = 0
         is_it_none = True
         for action in actions:
