@@ -85,6 +85,12 @@ def tests_write_prices():
             0.000000050569218629,
             "moralis",
         ),
+        (
+            "0x68BBED6A47194EFF1CF514B50EA91895597FC91E",
+            int(datetime.fromisoformat("2024-10-10 16:49:47.000000").timestamp()),
+            0.000000050569218629,
+            "moralis",
+        ),
     ]
     # truncate table
     with engine.connect() as conn:
