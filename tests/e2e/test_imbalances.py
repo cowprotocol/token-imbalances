@@ -22,6 +22,7 @@ def tests_process_single_transaction():
         "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE": 0,
     }
 
+
 def test_get_transaction_tokens():
     web3 = Web3(Web3.HTTPProvider(getenv("NODE_URL")))
     imbalances = RawTokenImbalances(web3, "mainnet")
