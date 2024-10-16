@@ -98,7 +98,6 @@ def tests_write_prices():
         res = conn.execute(
             text("SELECT token_address, time, price, source FROM prices")
         ).all()
-    # cleaning up the duplicate entry
     for i, (token_address, time, price, source) in enumerate(token_prices):
         assert HexBytes(res[i][0]) == HexBytes(token_address)
         assert res[i][1].replace(tzinfo=timezone.utc).timestamp() == time
