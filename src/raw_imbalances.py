@@ -342,10 +342,7 @@ class RawTokenImbalances:
     def compute_token_imbalances(self, tx_hash: str) -> dict[str, int]:
         """Process token imbalances for a given transaction and return imbalances."""
         try:
-            token_imbalances = self.aggregate_imbalances(tx_hash)
-            if token_imbalances:
-                logger.info(f"Token Imbalances on {self.chain_name} for tx {tx_hash}:")
-            return token_imbalances
+            return self.aggregate_imbalances(tx_hash)
         except Exception as e:
             logger.error(f"Failed to compute imbalances for transaction {tx_hash}: {e}")
             return {}

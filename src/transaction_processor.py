@@ -37,7 +37,6 @@ class TransactionProcessor:
         self.db = Database(db_engine, chain_name)
         self.imbalances = RawTokenImbalances(self.blockchain_data.web3, self.chain_name)
         self.price_providers = PriceFeed(activate=process_prices)
-        self.log_message: list[str] = []
 
     ###################### MAIN RUN LOOP ######################
     def run(self) -> None:
@@ -124,8 +123,8 @@ class TransactionProcessor:
         block_number: int,
     ) -> None:
         """Function processes a single tx to find imbalances, fees, prices including writing to database."""
-        self.log_message = []
         try:
+            logger.info(f"Processing transaction {tx_hash}")
             if self.process_prices:
                 self.process_tx_prices(tx_hash)
 
@@ -134,8 +133,6 @@ class TransactionProcessor:
 
             if self.process_fees:
                 self.process_tx_fees(tx_hash, auction_id, block_number)
-
-            logger.info("\n".join(self.log_message))
 
         except Exception as err:
             logger.error(f"An Error occurred: {err}")
@@ -210,9 +207,7 @@ class TransactionProcessor:
                             token_address,
                             imbalance,
                         )
-                        self.log_message.append(
-                            f"Token: {token_address}, Imbalance: {imbalance}"
-                        )
+                        logger.info(f"Token: {token_address}, Imbalance: {imbalance}")
             except Exception as err:
                 logger.error(f"Error: {err}")
 
