@@ -342,14 +342,13 @@ class RawTokenImbalances:
         except Exception as e:
             logger.error(f"Failed to compute imbalances for transaction {tx_hash}: {e}")
             return {}
-    
-    def get_transaction_tokens(self, tx_hash: str) -> list[tuple[str,str]]:
+
+    def get_transaction_tokens(self, tx_hash: str) -> list[tuple[str, str]]:
         token_imbalances = self.compute_token_imbalances(tx_hash)
         transaction_tokens = []
         for token_address in token_imbalances.keys():
             transaction_tokens.append((tx_hash, token_address))
         return transaction_tokens
-
 
 
 def main() -> None:
