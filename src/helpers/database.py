@@ -53,7 +53,7 @@ class Database:
                 "source": source,
             },
         )
-        return result.fetchall()
+        return result.fetchone()
 
     def write_token_imbalances(
         self,
