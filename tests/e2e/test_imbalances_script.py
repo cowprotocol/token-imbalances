@@ -2,13 +2,13 @@ from os import getenv
 
 from web3 import Web3
 
-from src.imbalances_script import RawTokenImbalances
+from src.raw_imbalances import RawTokenImbalances
 
 
 def tests_process_single_transaction():
     web3 = Web3(Web3.HTTPProvider(getenv("NODE_URL")))
     raw_imbalances = RawTokenImbalances(web3, "mainnet")
-    imbalances = raw_imbalances.compute_imbalances(
+    imbalances = raw_imbalances.compute_token_imbalances(
         "0xb75e03b63d4f06c56549effd503e1e37f3ccfc3c00e6985a5aacc9b0534d7c5c"
     )
 
