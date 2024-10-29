@@ -381,7 +381,7 @@ class TransactionProcessor:
                 )
                 self.log_message.append(f"Token: {token_address}, Price: {price} ETH")
         except Exception as err:
-            logger.error(f"Error: {err}")
+            logger.info(f"Error: {err}")
 
 
 def calculate_slippage(
