@@ -39,7 +39,7 @@ class Database:
                 connection.execute(text(query), params)
                 connection.commit()
             except Exception as e:
-                logger.error(f"Error executing and committing query: {e}")
+                logger.info(f"Error executing and committing query: {e}")
                 connection.rollback()
                 raise
 
@@ -183,7 +183,7 @@ class Database:
                     },
                 )
             except psycopg.errors.NumericValueOutOfRange:
-                logger.warning(
+                logger.info(
                     f"Error while writing price data. token: {token_address}, "
                     f"time: {time}, price: {price}, source: {source}"
                 )
