@@ -182,11 +182,13 @@ class Database:
                         "source": source,
                     },
                 )
-            except psycopg.errors.NumericValueOutOfRange:
-                logger.info(
-                    f"Error while writing price data. token: {token_address}, "
-                    f"time: {time}, price: {price}, source: {source}"
-                )
+            except Exception as err:
+                pass
+            # except psycopg.errors.NumericValueOutOfRange:
+            #     logger.info(
+            #         f"Error while writing price data. token: {token_address}, "
+            #         f"time: {time}, price: {price}, source: {source}"
+            #     )
 
     def get_latest_transaction(self) -> str | None:
         """Get latest transaction hash.
