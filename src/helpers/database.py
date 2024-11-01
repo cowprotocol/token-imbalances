@@ -43,6 +43,18 @@ class Database:
                 connection.rollback()
                 raise
 
+    def get_price(self, token_address, time, source):
+        query = "SELECT * FROM prices WHERE token_address = :token_address AND time = :time AND source = :source"
+        result = self.execute_query(
+            query,
+            {
+                "token_address": bytes.fromhex(token_address[2:]),
+                "time": datetime.fromtimestamp(time, tz=timezone.utc),
+                "source": source,
+            },
+        )
+        return result.fetchone()
+
     def write_token_imbalances(
         self,
         tx_hash: str,
@@ -173,6 +185,12 @@ class Database:
         )
         for token_address, time, price, source in prices:
             try:
+                if self.get_price(token_address, time, source) is not None:
+                    logger.info(
+                        "Skipping INSERT operation as entry already exists in PRICES table."
+                    )
+                    continue
+
                 self.execute_and_commit(
                     query,
                     {
