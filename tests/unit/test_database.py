@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 
+import pytest
 from hexbytes import HexBytes
 from sqlalchemy import create_engine, text
 
@@ -110,6 +111,38 @@ def tests_write_prices():
         assert res[i][1].replace(tzinfo=timezone.utc).timestamp() == time
         assert float(res[i][2]) == price
         assert res[i][3] == source
+
+
+def tests_write_prices_duplicates():
+    engine = create_engine(
+        f"postgresql+psycopg://postgres:postgres@localhost:5432/mainnet"
+    )
+    db = Database(engine, "mainnet")
+    token_address = "0xA0B86991C6218B36C1D19D4A2E9EB0CE3606EB48"
+    time = int(
+        datetime.fromisoformat("2024-10-10 16:48:47.000000")
+        .replace(tzinfo=timezone.utc)
+        .timestamp()
+    )
+    source = "coingecko"
+    price_1 = 0.000420454193230350
+    price_2 = price_1 + 0.0001
+    # truncate table
+    with engine.connect() as conn:
+        conn.execute(text("TRUNCATE prices"))
+        conn.commit()
+    # write data twice
+    db.write_prices_new([(token_address, time, price_1, source)])
+    db.write_prices_new([(token_address, time, price_2, source)])
+    # read data
+    with engine.connect() as conn:
+        res = conn.execute(
+            text("SELECT token_address, time, price, source FROM prices")
+        ).all()
+    assert HexBytes(res[0][0]) == HexBytes(token_address)
+    assert res[0][1].replace(tzinfo=timezone.utc).timestamp() == time
+    assert float(res[0][2]) == pytest.approx(price_2)
+    assert res[0][3] == source
 
 
 def test_get_latest_transaction():
