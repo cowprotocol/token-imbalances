@@ -75,13 +75,21 @@ def tests_write_prices():
     token_prices = [
         (
             "0xA0B86991C6218B36C1D19D4A2E9EB0CE3606EB48",
-            int(datetime.fromisoformat("2024-10-10 16:48:47.000000").timestamp()),
+            int(
+                datetime.fromisoformat("2024-10-10 16:48:47.000000")
+                .replace(tzinfo=timezone.utc)
+                .timestamp()
+            ),
             0.000420454193230350,
             "coingecko",
         ),
         (
             "0x68BBED6A47194EFF1CF514B50EA91895597FC91E",
-            int(datetime.fromisoformat("2024-10-10 16:49:47.000000").timestamp()),
+            int(
+                datetime.fromisoformat("2024-10-10 16:49:47.000000")
+                .replace(tzinfo=timezone.utc)
+                .timestamp()
+            ),
             0.000000050569218629,
             "moralis",
         ),
@@ -99,7 +107,7 @@ def tests_write_prices():
         ).all()
     for i, (token_address, time, price, source) in enumerate(token_prices):
         assert HexBytes(res[i][0]) == HexBytes(token_address)
-        assert res[i][1].timestamp() == time
+        assert res[i][1].replace(tzinfo=timezone.utc).timestamp() == time
         assert float(res[i][2]) == price
         assert res[i][3] == source
 
