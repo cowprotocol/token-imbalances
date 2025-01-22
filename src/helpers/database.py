@@ -1,8 +1,8 @@
 from datetime import datetime, timezone
 
+import psycopg.errors
 from hexbytes import HexBytes
-import psycopg
-from sqlalchemy import text, insert, Table, Column, Integer, LargeBinary, MetaData
+from sqlalchemy import Table, MetaData, insert, text, update
 from sqlalchemy.engine import Engine
 
 from src.helpers.config import check_db_connection, logger
@@ -167,28 +167,45 @@ class Database:
 
     def write_prices_new(self, prices: list[tuple[str, int, float, str]]) -> None:
         """Write prices to database."""
-        query = (
-            "INSERT INTO prices (token_address, time, price, source) "
-            "VALUES (:token_address, :time, :price, :source);"
-        )
-        for token_address, time, price, source in prices:
-            try:
-                self.execute_and_commit(
-                    query,
-                    {
-                        "token_address": bytes.fromhex(token_address[2:]),
-                        "time": datetime.fromtimestamp(time, tz=timezone.utc),
-                        "price": price,
-                        "source": source,
-                    },
-                )
-            except Exception as err:
-                pass
-            # except psycopg.errors.NumericValueOutOfRange:
-            #     logger.info(
-            #         f"Error while writing price data. token: {token_address}, "
-            #         f"time: {time}, price: {price}, source: {source}"
-            #     )
+        try:
+            prices_table = Table("prices", MetaData(), autoload_with=self.engine)
+
+            with self.engine.connect() as conn:
+                for token_address, time, price, source in prices:
+                    # First try to update
+                    update_stmt = (
+                        update(prices_table)
+                        .where(
+                            prices_table.c.token_address
+                            == bytes.fromhex(token_address[2:])
+                        )
+                        .where(
+                            prices_table.c.time
+                            == datetime.fromtimestamp(time, tz=timezone.utc)
+                        )
+                        .where(prices_table.c.source == source)
+                        .values(price=price)
+                    )
+                    result = conn.execute(update_stmt)
+
+                    # If no rows were updated, do an insert
+                    if result.rowcount == 0:
+                        insert_stmt = insert(prices_table).values(
+                            token_address=bytes.fromhex(token_address[2:]),
+                            time=datetime.fromtimestamp(time, tz=timezone.utc),
+                            price=price,
+                            source=source,
+                        )
+                        conn.execute(insert_stmt)
+
+                conn.commit()
+        except psycopg.errors.NumericValueOutOfRange:
+            logger.info(
+                f"Error while writing price data. token: {token_address}, "
+                f"time: {time}, price: {price}, source: {source}"
+            )
+        except Exception as e:
+            logger.error(f"Error writing prices: {e}")
 
     def get_latest_transaction(self) -> str | None:
         """Get latest transaction hash.
