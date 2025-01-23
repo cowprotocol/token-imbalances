@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 
 import psycopg.errors
+import sqlalchemy
 from hexbytes import HexBytes
 from sqlalchemy import Table, MetaData, insert, text, update
 from sqlalchemy.engine import Engine
@@ -171,39 +172,47 @@ class Database:
             prices_table = Table("prices", MetaData(), autoload_with=self.engine)
 
             with self.engine.connect() as conn:
-                for token_address, time, price, source in prices:
-                    # First try to update
-                    update_stmt = (
-                        update(prices_table)
-                        .where(
-                            prices_table.c.token_address
-                            == bytes.fromhex(token_address[2:])
-                        )
-                        .where(
-                            prices_table.c.time
-                            == datetime.fromtimestamp(time, tz=timezone.utc)
-                        )
-                        .where(prices_table.c.source == source)
-                        .values(price=price)
-                    )
-                    result = conn.execute(update_stmt)
+                with conn.begin():
+                    for token_address, time, price, source in prices:
+                        savepoint = conn.begin_nested()
+                        # First try to insert
+                        try:
+                            insert_stmt = insert(prices_table).values(
+                                token_address=bytes.fromhex(token_address[2:]),
+                                time=datetime.fromtimestamp(time, tz=timezone.utc),
+                                price=price,
+                                source=source,
+                            )
+                            conn.execute(insert_stmt)
+                        except (
+                            sqlalchemy.exc.IntegrityError
+                        ):  # update if insertion failed
+                            logger.info(
+                                f"Error while inserting price data. token: {token_address}, "
+                                f"time: {time}, price: {price}, source: {source}\n"
+                                "Updating price instead."
+                            )
+                            savepoint.rollback()
+                            update_stmt = (
+                                update(prices_table)
+                                .where(
+                                    prices_table.c.token_address
+                                    == bytes.fromhex(token_address[2:])
+                                )
+                                .where(
+                                    prices_table.c.time
+                                    == datetime.fromtimestamp(time, tz=timezone.utc)
+                                )
+                                .where(prices_table.c.source == source)
+                                .values(price=price)
+                            )
+                            conn.execute(update_stmt)
 
-                    # If no rows were updated, do an insert
-                    if result.rowcount == 0:
-                        insert_stmt = insert(prices_table).values(
-                            token_address=bytes.fromhex(token_address[2:]),
-                            time=datetime.fromtimestamp(time, tz=timezone.utc),
-                            price=price,
-                            source=source,
-                        )
-                        conn.execute(insert_stmt)
-
-                conn.commit()
-        except psycopg.errors.NumericValueOutOfRange:
-            logger.info(
-                f"Error while writing price data. token: {token_address}, "
-                f"time: {time}, price: {price}, source: {source}"
-            )
+                        except psycopg.errors.NumericValueOutOfRange:
+                            logger.info(
+                                f"Value out of range for price data. token: {token_address}, "
+                                f"time: {time}, price: {price}, source: {source}"
+                            )
         except Exception as e:
             logger.error(f"Error writing prices: {e}")
 
