@@ -121,21 +121,28 @@ class RawTokenImbalances:
                     actions.append(dict(action))
         return actions
 
-    def calculate_native_eth_imbalance(self, actions: list[dict], address: str) -> int:
+    def calculate_native_eth_imbalance(
+        self, actions: list[dict], address: str
+    ) -> int | None:
         """Extract ETH imbalance from transfer actions."""
         # inflow is the total value transferred to address param
-        inflow = sum(
-            _to_int(action["value"])
-            for action in actions
-            if Web3.to_checksum_address(action.get("to", "")) == address
-        )
-        # outflow is the total value transferred out of address param
-        outflow = sum(
-            _to_int(action["value"])
-            for action in actions
-            if Web3.to_checksum_address(action.get("from", "")) == address
-        )
-        return inflow - outflow
+        native_eth_imbalance = 0
+        is_it_none = True
+        for action in actions:
+            flow = 0
+            if Web3.to_checksum_address(action.get("to", "")) == address:
+                flow = _to_int(action["value"])
+            else:
+                if Web3.to_checksum_address(action.get("from", "")) == address:
+                    flow = (-1) * _to_int(action["value"])
+            if flow != 0:
+                is_it_none = False
+                native_eth_imbalance += flow
+
+        if is_it_none:
+            return None
+        else:
+            return native_eth_imbalance
 
     def extract_events(self, tx_receipt: dict) -> dict[str, list[dict]]:
         """Extract relevant events from the transaction receipt."""
@@ -297,7 +304,7 @@ class RawTokenImbalances:
         filter_sdai_events(events["DepositSDAI"], is_deposit=True)
         filter_sdai_events(events["WithdrawSDAI"], is_deposit=False)
 
-    def compute_imbalances(self, tx_hash: str) -> dict[str, int]:
+    def aggregate_imbalances(self, tx_hash: str) -> dict[str, int]:
         try:
             tx_receipt = self.get_transaction_receipt(tx_hash)
             if not tx_receipt:
@@ -332,6 +339,21 @@ class RawTokenImbalances:
             logger.error("Error computing imbalances for %s: %s", tx_hash, e)
             raise
 
+    def compute_token_imbalances(self, tx_hash: str) -> dict[str, int]:
+        """Process token imbalances for a given transaction and return imbalances."""
+        try:
+            return self.aggregate_imbalances(tx_hash)
+        except Exception as e:
+            logger.error(f"Failed to compute imbalances for transaction {tx_hash}: {e}")
+            return {}
+
+    def get_transaction_tokens(self, tx_hash: str) -> list[tuple[str, str]]:
+        token_imbalances = self.compute_token_imbalances(tx_hash)
+        transaction_tokens = []
+        for token_address in token_imbalances.keys():
+            transaction_tokens.append((tx_hash, token_address))
+        return transaction_tokens
+
 
 def main() -> None:
     """main function for finding imbalance for a single tx hash."""
@@ -339,7 +361,7 @@ def main() -> None:
     chain_name, web3 = find_chain_with_tx(tx_hash)
     rt = RawTokenImbalances(web3, chain_name)
     try:
-        imbalances = rt.compute_imbalances(tx_hash)
+        imbalances = rt.aggregate_imbalances(tx_hash)
         if imbalances:
             logger.info(f"Token Imbalances on {chain_name}:")
             for token_address, imbalance in imbalances.items():
