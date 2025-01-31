@@ -145,6 +145,37 @@ def tests_write_prices_duplicates():
     assert res[0][3] == source
 
 
+def tests_write_prices_large_value():
+    """Test that writing large prices does not crash.
+
+    The expected behavior is to not write the price to the database and log an error.
+    """
+    engine = create_engine(
+        f"postgresql+psycopg://postgres:postgres@localhost:5432/mainnet"
+    )
+    db = Database(engine, "mainnet")
+    token_address = "0xA0B86991C6218B36C1D19D4A2E9EB0CE3606EB48"
+    time = int(
+        datetime.fromisoformat("2024-10-10 16:48:47.000000")
+        .replace(tzinfo=timezone.utc)
+        .timestamp()
+    )
+    source = "coingecko"
+    price_1 = 1e100
+    # truncate table
+    with engine.connect() as conn:
+        conn.execute(text("TRUNCATE prices"))
+        conn.commit()
+    # write data twice
+    db.write_prices_new([(token_address, time, price_1, source)])
+    # read data
+    with engine.connect() as conn:
+        res = conn.execute(
+            text("SELECT token_address, time, price, source FROM prices")
+        ).all()
+    assert len(res) == 0
+
+
 def test_get_latest_transaction():
     # import has to happen after patching environment variable
     from src.helpers.database import Database
