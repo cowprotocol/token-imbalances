@@ -206,7 +206,14 @@ class Database:
                                 .where(prices_table.c.source == source)
                                 .values(price=price)
                             )
-                            conn.execute(update_stmt)
+                            res = conn.execute(update_stmt)
+                            if res.rowcount == 0:
+                                logger.error(
+                                    f"Update failed, no matching record found. token: "
+                                    f"{token_address}, time: {time}, price: {price},"
+                                    f"source: {source}\n"
+                                    "This indicates a faulty database state."
+                                )
 
                         except psycopg.errors.NumericValueOutOfRange:
                             logger.info(
