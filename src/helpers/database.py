@@ -1,8 +1,9 @@
 from datetime import datetime, timezone
 
+import psycopg.errors
+import sqlalchemy
 from hexbytes import HexBytes
-import psycopg
-from sqlalchemy import text, insert, Table, Column, Integer, LargeBinary, MetaData
+from sqlalchemy import Table, MetaData, insert, text, update
 from sqlalchemy.engine import Engine
 
 from src.helpers.config import check_db_connection, logger
@@ -167,28 +168,60 @@ class Database:
 
     def write_prices_new(self, prices: list[tuple[str, int, float, str]]) -> None:
         """Write prices to database."""
-        query = (
-            "INSERT INTO prices (token_address, time, price, source) "
-            "VALUES (:token_address, :time, :price, :source);"
-        )
-        for token_address, time, price, source in prices:
-            try:
-                self.execute_and_commit(
-                    query,
-                    {
-                        "token_address": bytes.fromhex(token_address[2:]),
-                        "time": datetime.fromtimestamp(time, tz=timezone.utc),
-                        "price": price,
-                        "source": source,
-                    },
-                )
-            except Exception as err:
-                pass
-            # except psycopg.errors.NumericValueOutOfRange:
-            #     logger.info(
-            #         f"Error while writing price data. token: {token_address}, "
-            #         f"time: {time}, price: {price}, source: {source}"
-            #     )
+        try:
+            prices_table = Table("prices", MetaData(), autoload_with=self.engine)
+
+            with self.engine.connect() as conn:
+                with conn.begin():
+                    for token_address, time, price, source in prices:
+                        savepoint = conn.begin_nested()
+                        # First try to insert
+                        try:
+                            insert_stmt = insert(prices_table).values(
+                                token_address=bytes.fromhex(token_address[2:]),
+                                time=datetime.fromtimestamp(time, tz=timezone.utc),
+                                price=price,
+                                source=source,
+                            )
+                            conn.execute(insert_stmt)
+                        except (
+                            sqlalchemy.exc.IntegrityError
+                        ):  # update if insertion failed
+                            logger.info(
+                                f"Error while inserting price data. token: {token_address}, "
+                                f"time: {time}, price: {price}, source: {source}\n"
+                                "Updating price instead."
+                            )
+                            savepoint.rollback()
+                            update_stmt = (
+                                update(prices_table)
+                                .where(
+                                    prices_table.c.token_address
+                                    == bytes.fromhex(token_address[2:])
+                                )
+                                .where(
+                                    prices_table.c.time
+                                    == datetime.fromtimestamp(time, tz=timezone.utc)
+                                )
+                                .where(prices_table.c.source == source)
+                                .values(price=price)
+                            )
+                            res = conn.execute(update_stmt)
+                            if res.rowcount == 0:
+                                logger.error(
+                                    f"Update failed, no matching record found. token: "
+                                    f"{token_address}, time: {time}, price: {price},"
+                                    f"source: {source}\n"
+                                    "This indicates a faulty database state."
+                                )
+
+                        except psycopg.errors.NumericValueOutOfRange:
+                            logger.info(
+                                f"Value out of range for price data. token: {token_address}, "
+                                f"time: {time}, price: {price}, source: {source}"
+                            )
+        except Exception as e:
+            logger.error(f"Error writing prices: {e}")
 
     def get_latest_transaction(self) -> str | None:
         """Get latest transaction hash.
