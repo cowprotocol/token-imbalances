@@ -187,7 +187,7 @@ class Database:
                         except (
                             sqlalchemy.exc.IntegrityError
                         ):  # update if insertion failed
-                            logger.info(
+                            logger.error(
                                 f"Error while inserting price data. token: {token_address}, "
                                 f"time: {time}, price: {price}, source: {source}\n"
                                 "Updating price instead."
