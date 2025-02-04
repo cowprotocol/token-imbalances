@@ -2,6 +2,11 @@ DOCKER_IMAGE_NAME=test_db_image
 DOCKER_CONTAINER_NAME=test_db_container
 DB_PORT=5432
 
+# Might be worth using poetry here so you can install packages in the venv and then
+# set the shell.
+setup-venv:
+	python -m venv .venv
+
 install:
 	pip install -r requirements.txt
 
@@ -20,4 +25,7 @@ stop_test_db:
 	docker rm $(DOCKER_CONTAINER_NAME) || true
 	docker rmi $(DOCKER_IMAGE_NAME) || true
 
+unittest:
+	pytest tests/unit
+	
 .PHONY: install imbalances daemon test_db run_test_db stop_test_db clean
