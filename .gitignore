@@ -1,6 +1,5 @@
 .env
 *venv
-.vscode/*
 .python_version
 .log
 __pycache__
