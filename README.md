@@ -16,6 +16,7 @@ Then once pyenv is install properly you should install python 3.10.16 or greater
 ```sh
 pyenv install 3.10.16
 ```
+There will need to be some env variables that you need to set like `CHAIN_SLEEP_TIME`, you can set those in a .env file. View the sample .env.sample file to see what you might need to set. 
 
 Then run `pyenv local 3.10.16` this will set the local env in your shell to this vesion, you can then proceed with the next set up instructions:
 
@@ -59,9 +60,7 @@ To run the unittests you can use the make target unittest `make unittest`, howev
 pip install "psycopg[binary,pool]"
 ```
 
-- There will need to be some env variables that you need to set like CHAIN_SLEEP_TIME, you can set those in a .env file. View the sample .env.sample file to see what you might need to set. 
-
-To take down the docker test db you can do:
+To shutdown the docker test db and remove the image/container you can do:
 
 ```sh
 	docker stop test_db_container || true
