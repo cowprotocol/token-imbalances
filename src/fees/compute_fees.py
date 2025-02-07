@@ -13,7 +13,7 @@ from eth_typing import ChecksumAddress
 from hexbytes import HexBytes
 from web3 import Web3
 
-from src.constants import REQUEST_TIMEOUT, NULL_ADDRESS
+from src.constants import REQUEST_TIMEOUT, NULL_ADDRESS, API_NUM_OF_RETRIES
 
 # types for trades
 
@@ -405,21 +405,24 @@ class OrderbookFetcher:
         return settlement_data
 
     def get_auction_data(self, tx_hash: HexBytes):
-        for environment, url in self.orderbook_urls.items():
-            try:
-                response = requests.get(
-                    url + f"solver_competition/by_tx_hash/{tx_hash.to_0x_hex()}",
-                    timeout=REQUEST_TIMEOUT,
-                )
-                response.raise_for_status()
-                auction_data = response.json()
-                sleep(0.5)  # introducing some delays so that we don't overload the api
-                return auction_data, environment
-            except requests.exceptions.HTTPError as err:
-                if err.response.status_code == 404:
-                    pass
+        for i in range(API_NUM_OF_RETRIES):
+            for environment, url in self.orderbook_urls.items():
+                try:
+                    response = requests.get(
+                        url + f"solver_competition/by_tx_hash/{tx_hash.to_0x_hex()}",
+                        timeout=REQUEST_TIMEOUT,
+                    )
+                    sleep(
+                        0.5
+                    )  # introducing some delays so that we don't overload the api
+                    response.raise_for_status()
+                    auction_data = response.json()
+                    return auction_data, environment
+                except requests.exceptions.HTTPError as err:
+                    if err.response.status_code == 404:
+                        pass
         raise ConnectionError(
-            f"Error fetching off-chain data for tx {tx_hash.to_0x_hex()}"
+            f"Error fetching api auction data for tx {tx_hash.to_0x_hex()}"
         )
 
     def get_order_data(self, uid: HexBytes, environment: str):
