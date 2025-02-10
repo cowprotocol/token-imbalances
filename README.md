@@ -1,24 +1,25 @@
 # token-imbalances
 
-This script is to calculate the raw token imbalances before and after a settlement.
+This repository is to calculate the raw token imbalances before and after a settlement.
 The raw token imbalances are stored in the raw_token_imbalances table.
 Additionally, coingecko prices for fetchable token addresses at the time of transaction are stored in the coingecko_prices table. These tables are a part of the Solver Slippage Database.
 These prices can be used to convert raw imbalances to ETH.
 
 ## Env Setup
-Install pyenv so you can manage different versions of python on your machine:
-```sh
-brew install pyenv
-```
 
-Then once pyenv is install properly you should install python 3.10.16 or greater.
+### Docker
+This repo uses Docker, but you could potentially use another another container management service like podman, see docs [here](https://podman.io/docs)
+For docker installation go to the [docker website](https://docs.docker.com/get-started/get-docker/)
 
-```sh
-pyenv install 3.10.16
-```
+### Python
+Install python if you don't have it already, current version is 3.12+
+[Installation instructions](https://realpython.com/installing-python/)
+
+For managing different versions of python you could look at using [pyenv](https://github.com/pyenv/pyenv).
+
 There will need to be some env variables that you need to set like `CHAIN_SLEEP_TIME`, you can set those in a .env file. View the sample .env.sample file to see what you might need to set. 
 
-Then run `pyenv local 3.10.16` this will set the local env in your shell to this vesion, you can then proceed with the next set up instructions:
+Once python has been set up and your env file is populated you can then proceed with the next set up instructions:
 
 **Set up virtual environment:**
 ```sh

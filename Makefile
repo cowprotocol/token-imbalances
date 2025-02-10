@@ -18,7 +18,9 @@ daemon:
 
 test_db:
 	docker build -t $(DOCKER_IMAGE_NAME) -f Dockerfile.test_db .
-	docker run -d --name $(DOCKER_CONTAINER_NAME) -p $(DB_PORT):$(DB_PORT) -v ${PWD}/database/00_legacy_tables.sql:/docker-entrypoint-initdb.d/00_legacy_tables.sql -v ${PWD}/database/01_table_creation.sql:/docker-entrypoint-initdb.d/01_table_creation.sql $(DOCKER_IMAGE_NAME)
+	docker run -d --name $(DOCKER_CONTAINER_NAME) \
+	-p $(DB_PORT):$(DB_PORT) -v ${PWD}/database/00_legacy_tables.sql:/docker-entrypoint-initdb.d/00_legacy_tables.sql \
+	-v ${PWD}/database/01_table_creation.sql:/docker-entrypoint-initdb.d/01_table_creation.sql $(DOCKER_IMAGE_NAME)
 
 stop_test_db:
 	docker stop $(DOCKER_CONTAINER_NAME) || true
