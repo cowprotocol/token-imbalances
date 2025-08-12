@@ -1,6 +1,7 @@
 """
 ERC20 ABI contract
 """
+
 erc20_abi = [
     {
         "constant": True,

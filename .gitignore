@@ -3,4 +3,5 @@ venv
 .log
 __pycache__
 .pytest_cache
+.mypy_cache
 slippage_project.log

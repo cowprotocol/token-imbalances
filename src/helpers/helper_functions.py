@@ -1,6 +1,7 @@
 """
 This file contains some auxiliary functions
 """
+
 from __future__ import annotations
 import sys
 import os

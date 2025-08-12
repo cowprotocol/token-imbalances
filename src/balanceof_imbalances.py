@@ -65,10 +65,10 @@ class BalanceOfImbalances:
     ) -> Dict[ChecksumAddress, Optional[int]]:
         """Get balances for all tokens at the given block number."""
         balances: Dict[ChecksumAddress, Optional[int]] = {}
-        balances[
-            self.web3.to_checksum_address(NATIVE_ETH_TOKEN_ADDRESS)
-        ] = self.get_eth_balance(
-            self.web3.to_checksum_address(SETTLEMENT_CONTRACT_ADDRESS), block_number
+        balances[self.web3.to_checksum_address(NATIVE_ETH_TOKEN_ADDRESS)] = (
+            self.get_eth_balance(
+                self.web3.to_checksum_address(SETTLEMENT_CONTRACT_ADDRESS), block_number
+            )
         )
 
         for token_address in token_addresses:

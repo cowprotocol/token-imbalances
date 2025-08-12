@@ -1,4 +1,5 @@
-""" Constants used for the token imbalances project """
+"""Constants used for the token imbalances project"""
+
 from web3 import Web3
 
 SETTLEMENT_CONTRACT_ADDRESS = Web3.to_checksum_address(
