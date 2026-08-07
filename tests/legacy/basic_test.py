@@ -2,7 +2,7 @@
 import os
 from dotenv import load_dotenv
 import pytest
-from src.imbalances_script import RawTokenImbalances
+from src.raw_imbalances import RawTokenImbalances
 from src.helpers.helper_functions import get_web3_instance
 
 load_dotenv()
@@ -54,6 +54,6 @@ def test_imbalances(tx_hash, expected_imbalances):
     """
     chain_name = os.getenv("CHAIN_NAME")
     rt = RawTokenImbalances(get_web3_instance(), chain_name)
-    imbalances = rt.compute_imbalances(tx_hash)
+    imbalances = rt.compute_token_imbalances(tx_hash)
     for token_address, expected_imbalance in expected_imbalances.items():
         assert imbalances.get(token_address) == expected_imbalance

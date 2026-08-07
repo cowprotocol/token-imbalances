@@ -9,16 +9,12 @@ from src.helpers.blockchain_data import BlockchainData
 
 def tests_process_single_transaction():
     chain_name = "mainnet"
-    web3, db_engine = initialize_connections()
-    blockchain = BlockchainData(web3)
-    db = Database(db_engine, chain_name)
-
     process_imbalances = True
     process_fees = False
     process_prices = True
 
     processor = TransactionProcessor(
-        blockchain, db, chain_name, process_imbalances, process_fees, process_prices
+        chain_name, process_imbalances, process_fees, process_prices
     )
 
     # delete data

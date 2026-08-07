@@ -1,6 +1,6 @@
 from hexbytes import HexBytes
 from web3 import Web3
-from src.imbalances_script import RawTokenImbalances
+from src.raw_imbalances import RawTokenImbalances
 from src.price_providers.price_feed import PriceFeed
 from src.fees.compute_fees import compute_all_fees_of_batch
 from src.transaction_processor import calculate_slippage
@@ -25,7 +25,7 @@ class Compute:
         self.price_providers = PriceFeed()
 
     def compute_data(self, tx_hash: str):
-        token_imbalances = self.imbalances.compute_imbalances(tx_hash)
+        token_imbalances = self.imbalances.compute_token_imbalances(tx_hash)
         protocol_fees, partner_fees, network_fees = compute_all_fees_of_batch(
             HexBytes(tx_hash)
         )
