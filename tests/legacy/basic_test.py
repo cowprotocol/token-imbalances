@@ -1,4 +1,5 @@
-""" Runs a basic test for raw imbalance calculation edge-cases. """
+"""Runs a basic test for raw imbalance calculation edge-cases."""
+
 import os
 from dotenv import load_dotenv
 import pytest

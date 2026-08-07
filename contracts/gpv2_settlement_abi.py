@@ -1,5 +1,4 @@
-"""Contract ABI of the CoW Protocol settlement contract
-"""
+"""Contract ABI of the CoW Protocol settlement contract"""
 
 gpv2_settlement_abi = [
     {
